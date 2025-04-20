@@ -521,28 +521,29 @@ update() {
 				fi
 
 				new_file_list="$(/bin/sh ${dist_dir}${QOSMATE_SERVICE_PATH} print_file_list "$component" "GEN JS EXTRA")" &&
-					[ -n "$new_file_list" ] &&
-				exec_files="$(/bin/sh ${dist_dir}${QOSMATE_SERVICE_PATH} print_file_list "$component" "EXEC")" &&
-					[ -n "$exec_files" ] || {
+				write_str_to_file "$new_file_list" "${dist_dir}/new_file_list" &&
+					[ -n "$new_file_list" ] || {
 							error_out "Failed to get file list from the fetched QoSmate version." \
 								"NOTE: Older qosmate versions may not support printing the file list."
 							upd_failed
 							return 1
 						}
-				write_str_to_file "$new_file_list" "${dist_dir}/new_file_list" &&
+
+				exec_files="$(/bin/sh ${dist_dir}${QOSMATE_SERVICE_PATH} print_file_list "$component" "EXEC")" &&
 				write_str_to_file "$exec_files" "${dist_dir}/exec_files" ||
 					{ upd_failed; return 1; }
 		esac
 	done
 
-	/bin/sh "${dist_dir}/${QOSMATE_SERVICE_PATH}" post_update_1
+	/bin/sh "${QOSMATE_UPD_DIR}/BACKEND${QOSMATE_SERVICE_PATH}" post_update_1
 
 	case "$version" in
 		package*)
 			pkg_update_not_impl
 			return 1 ;;
 		*)
-			install_qosmate_files "$dist_dir" "$ref" "$QOSMATE_UPD_CHANNEL" || { upd_failed; return 1; }
+			install_qosmate_files "${QOSMATE_UPD_DIR}/BACKEND" "${QOSMATE_UPD_DIR}/FRONTEND" "$ref" "$QOSMATE_UPD_CHANNEL" ||
+				{ upd_failed; return 1; }
 			rm -rf "$QOSMATE_UPD_DIR"
 	esac
 
@@ -603,7 +604,7 @@ install_qosmate_files() {
 				{ inst_failed "Failed to get timestamp of fetched service file."; return 1; }
 
 			# set version and update channel in the service file
-			local preinst_service_path="${dist_dir}/${QOSMATE_SERVICE_PATH}"
+			local preinst_service_path="${dist_dir}${QOSMATE_SERVICE_PATH}"
 			sed -i "
 				/^\s*QOSMATE_VERSION=/{s/.*/QOSMATE_VERSION=${version}/;}
 				/^\s*QOSMATE_UPD_CHANNEL=/{s/.*/QOSMATE_UPD_CHANNEL=${upd_channel}/;}" \
