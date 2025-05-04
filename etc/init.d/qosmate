@@ -434,13 +434,14 @@ get_gh_ref_data() {
 			return 1
 	esac
 
-	# Get ref for release/snapshot
+	# Get ref via GH API
 	[ -z "$gh_ref" ] && gh_ref="$(
 		case "$gh_channel" in
 			release)
 				uclient-fetch "${gh_url_api}/releases" -O- 2> "$ref_ucl_err_file" | {
 					jsonfilter -e '@[@.prerelease=false]' |
-					jsonfilter -a -e "@[@.target_commitish=\"${main_branch}\"].tag_name"
+					jsonfilter -a -e "@[@.target_commitish=\"${main_branch}\"].tag_name" |
+					sed 's/^v//'
 					cat 1>/dev/null
 				} ;;
 			snapshot|branch=*|commit=*)
