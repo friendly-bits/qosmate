@@ -15,7 +15,7 @@ create_qdisc() {
 
 apply_rules_no_json() {
 	# Indentation expresses class/qdisc hierarchy position
-	create_qdisc root 1:
+	create_qdisc root 1: &&
 
 		{ [ "$DIR" = UP ] || create_class hfsc_lan 1:2 1: ; } &&
 
