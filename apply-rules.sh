@@ -3,10 +3,6 @@
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd -P)
 
-TEST_JSON="${script_dir}/${1:-"hfsc-rules.json"}"
-
-. "${script_dir}/json-parser.sh"
-
 # prints each argument to a separate line
 print_msg() {
     local _arg
@@ -449,20 +445,39 @@ setup_hfsc_dir() {
 	fi
 }
 
+apply_hfsc_rules() {
+	if [ -n "$USE_JSON" ]; then
+		init_json_parser "${1:-"$TEST_JSON"}" &&
+		parse_json
+	else
+		apply_rules_no_json
+	fi
+}
+
 setup_hfsc() {
 	local DIR
 	for DIR in UP DOWN; do
-		setup_hfsc_dir "$DIR"
-		init_json_parser "${1:-"$TEST_JSON"}" &&
-		parse_json || exit 1
+		setup_hfsc_dir "$DIR" &&
+		apply_hfsc_rules "$@" || exit 1
 	done
 	:
 }
 
 
-##############################
-#       Main Logic
-##############################
+# Add a value to use the json implementation
+USE_JSON=
+
+if [ -n "$USE_JSON" ]; then
+	echo "!!! USING JSON IMPLEMENTATION !!!"
+	TEST_JSON="${script_dir}/${1:-"hfsc-rules.json"}"
+	. "${script_dir}/json-parser.sh"
+else
+	echo "!!! USING JSON-LESS IMPLEMENTATION !!!"
+	. "${script_dir}/hfsc-no-json.sh"
+fi
+
+
+# Hard-coded config vars
 
 ROOT_QDISC=hfsc
 gameqdisc=drr
@@ -484,9 +499,13 @@ netemdist=normal
 pktlossp=none
 PACKETSIZE=450
 
+
+##############################
+#       Main Logic
+##############################
+
 LAN=ifb-$WAN
 MTU=1500
-
 
 
 case "$ROOT_QDISC" in
@@ -515,6 +534,6 @@ case "$ROOT_QDISC" in hfsc|hybrid)
 esac
 
 case "$ROOT_QDISC" in
-	hfsc) setup_hfsc ;;
-	hybrid) setup_hybrid
+	hfsc) setup_hfsc "$@" ;;
+	hybrid) setup_hybrid "$@"
 esac
