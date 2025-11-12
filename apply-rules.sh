@@ -335,7 +335,7 @@ create_tc_obj() {
 	inval_obj() { error_out "create_tc_obj: Invalid object id '$tc_obj_id'"; }
 	inval_parent() { error_out "create_tc_obj: Invalid parent id '$tc_parent_id' for object '$tc_obj_id'"; }
 
-	local helper_func helper_args unexp_func='' PARAMS='' \
+	local helper_short helper_func helper_args unexp_func='' PARAMS='' \
 		helper_str="$1" tc_obj_type="$2" tc_obj_id="$3" tc_parent_id="$4"
 
 	[ -n "$helper_str" ] || { error_out "Helper function not specified!"; return 1; }
@@ -353,22 +353,21 @@ create_tc_obj() {
 		*) inval_parent; return 1
 	esac
 
-	helper_func="${helper_str%% *}"
-	helper_args="${helper_str#"$helper_func"}"
+	helper_short="${helper_str%% *}"
+	helper_args="${helper_str#"$helper_short"}"
 
 	case "$tc_obj_type" in
 		QDISC)
-			case "$helper_func" in
-				root_qdisc_helper|hfsc_game_qdisc_helper|hfsc_non_game_qdisc_helper| \
-				cake_qdisc_helper|fq_codel_qdisc_helper|red_qdisc_helper)
-					${helper_func} ${helper_args} ;;
+			case "$helper_short" in
+				root|hfsc_game|hfsc_non_game|cake|fq_codel|red)
+					${helper_short}_qdisc_helper ${helper_args} ;;
 				*) unexp_func=1; false
 			esac &&
 			echo "${pr_offset}** tc qdisc add dev \"$DEV\"${tc_parent_id:+ parent }${tc_parent_id}${tc_obj_id:+ handle }${tc_obj_id} ${PARAMS} **" ;;
 		CLASS)
-			case "$helper_func" in
-				hfsc_lan_class_helper|hfsc_main_link_class_helper|hfsc_tin_class_helper|game_drr_qfq_class_helper)
-					${helper_func} ${helper_args} ;;
+			case "$helper_short" in
+				hfsc_lan|hfsc_main_link|hfsc_tin|game_drr_qfq)
+					${helper_short}_class_helper ${helper_args} ;;
 				*) unexp_func=1; false
 			esac &&
 			echo "${pr_offset}** tc class add dev \"$DEV\" parent ${tc_parent_id} classid ${tc_obj_id} ${PARAMS} **" ;;
