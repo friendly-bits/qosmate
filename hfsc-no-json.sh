@@ -15,7 +15,7 @@ create_qdisc() {
 
 apply_rules_no_json() {
 	# Indentation expresses class/qdisc/filters hierarchy position
-	create_qdisc root "1:" &&
+	create_qdisc "root" "1:" "root" &&
 
 		{ [ "$DIR" = UP ] || create_class "hfsc_lan" "1:2" "1:" ; } &&
 
@@ -49,11 +49,11 @@ apply_rules_no_json() {
 				create_qdisc "hfsc_game" "10:" "1:11" &&
 					case "$gameqdisc" in
 						drr|qfq)
-							create_class "game_drr_qfq" 8000 "10:1" "10:" &&
+							create_class "game_drr_qfq 8000" "10:1" "10:" &&
 								create_qdisc "red" "11:" "10:1" &&
-							create_class "game_drr_qfq" 4000 "10:2" "10:" &&
+							create_class "game_drr_qfq 4000" "10:2" "10:" &&
 								create_qdisc "red" "12:" "10:2" &&
-							create_class "game_drr_qfq" 1000 "10:3" "10:" &&
+							create_class "game_drr_qfq 1000" "10:3" "10:" &&
 								create_qdisc "red" "13:" "10:3" ;;
 						*) :
 					esac
