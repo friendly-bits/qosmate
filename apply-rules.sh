@@ -67,7 +67,7 @@ hfsc_tin_class_helper() {
 		"steady_rate:$((base_steady_rate*steady_percent/100))"
 }
 
-drr_qfq_class_helper() {
+game_drr_qfq_class_helper() {
 	[ -n "$1" ] || : # TODO: throw error
 	local param
 	case "$gameqdisc" in
@@ -350,7 +350,7 @@ create_tc_obj() {
 			echo "${pr_offset}** tc qdisc add dev \"$DEV\"${tc_parent_obj_id:+ parent }${tc_parent_obj_id}${tc_obj_id:+ handle }${tc_obj_id} ${PARAMS} **" ;;
 		CLASS)
 			case "$helper_func" in
-				hfsc_lan_class_helper|hfsc_main_link_class_helper|hfsc_tin_class_helper|drr_qfq_class_helper)
+				hfsc_lan_class_helper|hfsc_main_link_class_helper|hfsc_tin_class_helper|game_drr_qfq_class_helper)
 					${helper_func} ${helper_args} ;;
 				*) unexp_func=1; false
 			esac &&

@@ -51,17 +51,17 @@
 
 					"CLASS_10_1": {
 						"requires": "gameqdisc=drr|qfq",
-						"helper": "drr_qfq_class_helper 8000",
+						"helper": "game_drr_qfq_class_helper 8000",
 						"QDISC_11": { "helper": "red_qdisc_helper" }
 					},
 					"CLASS_10_2": {
 						"requires": "gameqdisc=drr|qfq",
-						"helper": "drr_qfq_class_helper 4000",
+						"helper": "game_drr_qfq_class_helper 4000",
 						"QDISC_12": { "helper": "red_qdisc_helper" }
 					},
 					"CLASS_10_3": {
 						"requires": "gameqdisc=drr|qfq",
-						"helper": "drr_qfq_class_helper 1000",
+						"helper": "game_drr_qfq_class_helper 1000",
 						"QDISC_13": { "helper": "red_qdisc_helper" }
 					}
 				}
