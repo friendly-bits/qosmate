@@ -4,13 +4,13 @@
 create_class() {
 	local helper_short="${1%% *}"
 	local helper_args="${1#"$helper_short"}"
-	create_tc_obj "${helper_short}_class_helper${helper_args:+" $helper_args"}" CLASS "$2" "$3"
+	create_tc_obj "${helper_short}_class_helper${helper_args}" CLASS "$2" "$3"
 }
 
 create_qdisc() {
 	local helper_short="${1%% *}"
 	local helper_args="${1#"$helper_short"}"
-	create_tc_obj "${helper_short}_qdisc_helper${helper_args:+" $helper_args"}" QDISC "$2" "$3"
+	create_tc_obj "${helper_short}_qdisc_helper${helper_args}" QDISC "$2" "$3"
 }
 
 apply_rules_no_json() {
@@ -51,9 +51,9 @@ apply_rules_no_json() {
 						drr|qfq)
 							create_class "drr_qfq" 8000 10:1 10: &&
 								create_qdisc "red" 11: 10:1 &&
-							create_class "drr_qfq" 4000 10:2 10:1 &&
+							create_class "drr_qfq" 4000 10:2 10: &&
 								create_qdisc "red" 12: 10:2 &&
-							create_class "drr_qfq" 1000 10:3 10:2 &&
+							create_class "drr_qfq" 1000 10:3 10: &&
 								create_qdisc "red" 13: 10:3 ;;
 						*) :
 					esac
