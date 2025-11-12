@@ -72,7 +72,7 @@ game_drr_qfq_class_helper() {
 	local param
 	case "$gameqdisc" in
 		drr) param=quantum ;;
-		qfq) param=weithg ;;
+		qfq) param=weight ;;
 		*) # TODO: throw error
 	esac
 
