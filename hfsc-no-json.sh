@@ -46,6 +46,9 @@ apply_rules_no_json() {
 				done &&
 
 			create_class "hfsc_tin realtime" "1:11" "1:" &&
+				for family in ipv4 ipv6; do
+					create_filters "EF CS5 CS6 CS7" "1:11" "$family" || return 1
+				done &&
 				create_qdisc "hfsc_game" "10:" "1:11" &&
 					case "$gameqdisc" in
 						drr|qfq)
