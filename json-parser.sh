@@ -80,7 +80,7 @@ get_json_var() {
 }
 
 get_json_arr() {
-	local ga_val ga_values _type='' \
+	local ga_val ga_values='' _type='' \
 		ga_out_var="$1" ga_key="$2"
 
 	json_select_h "$ga_key" || return 1
@@ -90,7 +90,7 @@ get_json_arr() {
 		i=$((i+1))
 		debug_run json_get_type _type $i && [ -n "$_type" ] || break
 		get_json_var ga_val ${i} || return 1
-		ga_values="${ga_values:+ }${ga_val}"
+		ga_values="${ga_values}${ga_values:+ }${ga_val}"
 	done
 	json_select_h .. || return 1
 	eval "$ga_out_var=\"\${ga_values}\""
@@ -121,14 +121,16 @@ traverse_obj() {
 			json_obj="$1" \
 			tc_parent_obj_id="$2"
 	
-	local traverse_parent_id="$tc_parent_obj_id"
-
 	case "$json_obj" in
-		ROOT) get_child_keys child_keys || { json_err "No child keys found."; return 1; } ;;
+		ROOT)
+			tc_parent_obj_id=root
+			get_child_keys child_keys || { json_err "No child keys found."; return 1; } ;;
 		*)
 			json_select_h "$json_obj" || return 1
 			get_child_keys child_keys
 	esac
+
+	local traverse_parent_id="$tc_parent_obj_id"
 
 	case "$json_obj" in
 		QDISC)
