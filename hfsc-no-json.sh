@@ -4,13 +4,13 @@
 create_class() {
 	local helper_short="${1%% *}"
 	local helper_args="${1#"$helper_short"}"
-	create_tc_obj "${helper_short}_class_helper${helper_args}" CLASS "$2" "$3"
+	create_tc_obj "${helper_short}${helper_args}" CLASS "$2" "$3"
 }
 
 create_qdisc() {
 	local helper_short="${1%% *}"
 	local helper_args="${1#"$helper_short"}"
-	create_tc_obj "${helper_short}_qdisc_helper${helper_args}" QDISC "$2" "$3"
+	create_tc_obj "${helper_short}${helper_args}" QDISC "$2" "$3"
 }
 
 apply_rules_no_json() {
