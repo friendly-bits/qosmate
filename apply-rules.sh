@@ -363,14 +363,14 @@ create_tc_obj() {
 					${helper_short}_qdisc_helper ${helper_args} ;;
 				*) unexp_func=1; false
 			esac &&
-			echo "${pr_offset}** tc qdisc add dev \"$DEV\"${tc_parent_id:+ parent }${tc_parent_id}${tc_obj_id:+ handle }${tc_obj_id} ${PARAMS} **" ;;
+			echo "tc qdisc add dev \"$DEV\"${tc_parent_id:+ parent }${tc_parent_id}${tc_obj_id:+ handle }${tc_obj_id} ${PARAMS}" ;;
 		CLASS)
 			case "$helper_short" in
 				hfsc_lan|hfsc_main_link|hfsc_tin|game_drr_qfq)
 					${helper_short}_class_helper ${helper_args} ;;
 				*) unexp_func=1; false
 			esac &&
-			echo "${pr_offset}** tc class add dev \"$DEV\" parent ${tc_parent_id} classid ${tc_obj_id} ${PARAMS} **" ;;
+			echo "tc class add dev \"$DEV\" parent ${tc_parent_id} classid ${tc_obj_id} ${PARAMS}" ;;
 		*) false
 	esac ||
 		{
@@ -412,7 +412,7 @@ create_filters() {
 
 		# shellcheck disable=SC2086
 #		tc filter add dev "$DEV" parent 1: protocol "$proto" prio "$prio" u32 match $match_str classid "$class_id"
-		echo "${pr_offset}*** tc filter add dev \"$DEV\" parent 1: protocol \"$proto\" prio \"$prio\" u32 match $match_str classid \"$class_id\" ***"
+		echo "    tc filter add dev \"$DEV\" parent 1: protocol \"$proto\" prio \"$prio\" u32 match $match_str classid \"$class_id\""
 	done
 }
 
@@ -481,7 +481,7 @@ setup_hfsc() {
 
 
 # Add a value to use the json implementation
-USE_JSON=
+USE_JSON=1
 
 if [ -n "$USE_JSON" ]; then
 	echo "!!! USING JSON IMPLEMENTATION !!!"

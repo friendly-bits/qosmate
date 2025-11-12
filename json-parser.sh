@@ -1,8 +1,6 @@
 #!/bin/sh
 # shellcheck disable=SC3043,SC3060
 
-# DEBUG=1
-
 _NL_='
 '
 DEFAULT_IFS=" 	${_NL_}"
@@ -13,22 +11,6 @@ json_err() {
 	[ -z "$ERR_PATH_REPORTED" ] && error_out "At json path '${JSON_PATH}${2:+":"}${2}'"
 	ERR_PATH_REPORTED=1
 	[ -n "$1" ] && error_out "$1"
-}
-
-inc_pr_offset() { pr_offset="${pr_offset}    "; }
-
-debug_run() {
-	[ -n "$DEBUG" ] && set +x
-	local rv cmd="$1"
-	shift
-	"$cmd" "$@"
-	rv=$?
-	[ -n "$DEBUG" ] && set +x
-	[ $rv = 0 ] ||
-		case "$cmd" in json_is_a|json_get_type) ;; *) json_err "$cmd [$*] failed"; esac
-
-	[ -n "$DEBUG" ] && set -x
-	return $rv
 }
 
 json_select_h() {
@@ -68,14 +50,13 @@ check_shell_expr() {
 
 get_json_var() {
 	local gv_out_var="$1" gv_key="$2" gv_val="$3"
-	[ -n "$gv_val" ] || debug_run json_get_var gv_val "$gv_key" &&
+	[ -n "$gv_val" ] || json_get_var gv_val "$gv_key" &&
 	case "$gv_val" in
 		*\$[a-zA-Z_\{\(]* )
 			check_shell_expr "$gv_val" &&
 			eval "gv_val=\"$gv_val\"" ;;
 	esac || { json_err "Failed to get var value." "$gv_key"; return 1; }
 
-	echo "${pr_offset}${gv_key}='${gv_val}'"
 	eval "$gv_out_var=\"\${gv_val}\""
 }
 
@@ -88,7 +69,7 @@ get_json_arr() {
 	i=0
 	while :; do
 		i=$((i+1))
-		debug_run json_get_type _type $i && [ -n "$_type" ] || break
+		json_get_type _type $i && [ -n "$_type" ] || break
 		get_json_var ga_val ${i} || return 1
 		ga_values="${ga_values}${ga_values:+ }${ga_val}"
 	done
@@ -99,7 +80,8 @@ get_json_arr() {
 get_child_keys() {
 	eval "$1="
 	local _key _keys _child_keys=
-	debug_run json_get_keys _keys &&
+	json_get_keys _keys &&
+	[ -n "$_keys" ] &&
 	for _key in $_keys; do
 		case "$_key" in
 			comment*) ;;
@@ -117,7 +99,6 @@ traverse_obj() {
 	local tc_obj_id='' \
 		json_obj_cnt=0 json_child_type key val child_keys='' family class_enums \
 		req_key req_val req_vals \
-		pr_offset="$pr_offset" \
 			json_obj="$1" \
 			tc_parent_obj_id="$2"
 	
@@ -153,8 +134,6 @@ traverse_obj() {
 				return 1
 			esac
 
-			echo "${pr_offset}+${json_obj%%_*}${tc_obj_id:+ }${tc_obj_id}"
-			inc_pr_offset
 			traverse_parent_id="$tc_obj_id" ;;
 		*)
 			json_err "Unexpected object '$json_obj'!"
@@ -164,7 +143,7 @@ traverse_obj() {
 	for key in $child_keys; do
 		json_obj_cnt=$((json_obj_cnt + 1))
 
-		debug_run json_get_type json_child_type "$key" || { json_err "Failed to select key '$key'."; return 1; }
+		json_get_type json_child_type "$key" || { json_err "Failed to get type of key '$key'."; return 1; }
 
 		[ "$json_child_type" = int ] && json_child_type=string # int is equivalent to string for our use case
 
@@ -245,8 +224,6 @@ init_json_parser() {
 	# shellcheck source=/dev/null
 	. /usr/share/libubox/jshn.sh &&
 	json_load_file "${1}" || { json_err "Failed to load file '$1'."; exit 1; }
-
-	[ -n "$DEBUG" ] && set -x
 
 	JSON_PATH="ROOT"
 }
