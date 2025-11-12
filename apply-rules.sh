@@ -332,10 +332,27 @@ hybrid_bulk_helper() {
 ## TC OBJECTS AND FILTERS
 
 create_tc_obj() {
+	inval_obj() { error_out "create_tc_obj: Invalid object id '$tc_obj_id'"; }
+	inval_parent() { error_out "create_tc_obj: Invalid parent id '$tc_parent_id' for object '$tc_obj_id'"; }
+
 	local helper_func helper_args unexp_func='' PARAMS='' \
-		helper_str="$1" tc_obj_type="$2" tc_obj_id="$3" tc_parent_obj_id="$4"
+		helper_str="$1" tc_obj_type="$2" tc_obj_id="$3" tc_parent_id="$4"
 
 	[ -n "$helper_str" ] || { error_out "Helper function not specified!"; return 1; }
+
+	case "$tc_obj_id" in
+		*![0-9:]*) inval_obj; return 1 ;;
+		''|*[0-9]:*) ;;
+		*) inval_obj; return 1
+	esac
+
+	case "$tc_parent_id" in
+		root) tc_parent_id='' ;;
+		*![0-9:]*) inval_parent; return 1 ;;
+		*[0-9]:*) ;;
+		*) inval_parent; return 1
+	esac
+
 	helper_func="${helper_str%% *}"
 	helper_args="${helper_str#"$helper_func"}"
 
@@ -347,14 +364,14 @@ create_tc_obj() {
 					${helper_func} ${helper_args} ;;
 				*) unexp_func=1; false
 			esac &&
-			echo "${pr_offset}** tc qdisc add dev \"$DEV\"${tc_parent_obj_id:+ parent }${tc_parent_obj_id}${tc_obj_id:+ handle }${tc_obj_id} ${PARAMS} **" ;;
+			echo "${pr_offset}** tc qdisc add dev \"$DEV\"${tc_parent_id:+ parent }${tc_parent_id}${tc_obj_id:+ handle }${tc_obj_id} ${PARAMS} **" ;;
 		CLASS)
 			case "$helper_func" in
 				hfsc_lan_class_helper|hfsc_main_link_class_helper|hfsc_tin_class_helper|game_drr_qfq_class_helper)
 					${helper_func} ${helper_args} ;;
 				*) unexp_func=1; false
 			esac &&
-			echo "${pr_offset}** tc class add dev \"$DEV\" parent ${tc_parent_obj_id} classid ${tc_obj_id} ${PARAMS} **" ;;
+			echo "${pr_offset}** tc class add dev \"$DEV\" parent ${tc_parent_id} classid ${tc_obj_id} ${PARAMS} **" ;;
 		*) false
 	esac ||
 		{
