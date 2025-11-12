@@ -471,8 +471,9 @@ apply_hfsc_rules() {
 }
 
 setup_hfsc() {
-	local DIR
-	for DIR in UP DOWN; do
+	local DIR directions="UP DOWN"
+	[ -n "$USE_JSON" ] && [ -n "$TRANSLATE_TO_NO_JSON" ] && directions=DOWN
+	for DIR in $directions; do
 		setup_hfsc_dir "$DIR" &&
 		apply_hfsc_rules "$@" || exit 1
 	done
@@ -481,7 +482,10 @@ setup_hfsc() {
 
 
 # Add a value to use the json implementation
-USE_JSON=1
+USE_JSON=
+
+# Add a value to only print json-to-jsonless translation when USE_JSON is set
+TRANSLATE_TO_NO_JSON=1
 
 if [ -n "$USE_JSON" ]; then
 	echo "!!! USING JSON IMPLEMENTATION !!!"
