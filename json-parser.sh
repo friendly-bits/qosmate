@@ -13,6 +13,9 @@ json_err() {
 	[ -n "$1" ] && error_out "$1"
 }
 
+inc_pr_offset() { pr_offset="${pr_offset}    "; }
+dec_pr_offset() { pr_offset="${pr_offset%    }"; }
+
 json_select_h() {
 	case "$1" in
 		'') false ;;
@@ -97,8 +100,10 @@ get_child_keys() {
 
 traverse_obj() {
 	local tc_obj_id='' \
-		json_obj_cnt=0 json_child_type key val child_keys='' family class_enums \
+		obj_req_str='' \
+		json_obj_cnt=0 json_child_type key val child_keys='' family families class_enums \
 		req_key req_val req_vals \
+		pr_offset="$pr_offset" \
 			json_obj="$1" \
 			tc_parent_obj_id="$2"
 	
@@ -177,6 +182,14 @@ traverse_obj() {
 						req_vals="${val#"$req_key"}"
 						req_vals="${req_vals#=}"
 
+						if [ -n "$TRANSLATE_TO_NO_JSON" ]; then
+							echo "${pr_offset}case \"${req_key}\" in ${req_vals})"
+							obj_req_str="${val}: "
+							req_pr_str="${req_pr_str:+ }${obj_req_str}"
+							inc_pr_offset
+							continue
+						fi
+
 						local match_err=''
 						[ -n "$req_vals" ] &&
 						local IFS="|" &&
@@ -190,7 +203,18 @@ traverse_obj() {
 						[ -n "$match_err" ] && { json_err "Failed to parse 'requires' statement '$val'."; return 1; }
 						break ;;
 					helper)
-						create_tc_obj "$val" "${json_obj%%_*}" "$tc_obj_id" "$tc_parent_obj_id" || return 1
+						local tc_obj_type="${json_obj%%_*}"
+						if [ -z "$TRANSLATE_TO_NO_JSON" ]; then
+							create_tc_obj "$val" "${tc_obj_type}" "$tc_obj_id" "$tc_parent_obj_id" || return 1
+						else
+							case "$tc_obj_type" in
+								CLASS) tc_obj_type_lc=class ;;
+								QDISC) tc_obj_type_lc=qdisc ;;
+								*) json_err "Unexpected tc obj type '$tc_obj_type'."; return 1
+							esac
+							echo "${pr_offset}create_${tc_obj_type_lc} \"$val\" \"$tc_obj_id\" \"$tc_parent_obj_id\" &&"
+						fi
+						inc_pr_offset
 						continue ;;
 					*)
 						json_err "Unexpected string/int key '$key'"
@@ -199,18 +223,44 @@ traverse_obj() {
 			array)
 				get_json_arr class_enums "$key" || return 1
 				case "$key" in
-					FILTERS)
-						for family in ipv4 ipv6; do
-							create_filters "$class_enums" "$tc_obj_id" "$family" || return 1
-						done ;;
-					FILTERS_IPV4|FILTERS_IPV6)
-						family="ipv${key#FILTERS_IPV}"
-						create_filters "$class_enums" "$tc_obj_id" "$family" || return 1 ;;
+					FILTERS|FILTERS_IPV4|FILTERS_IPV6)
+						if [ "$key" = FILTERS ]; then
+							families="ipv4 ipv6"
+							[ -n "$TRANSLATE_TO_NO_JSON" ] && {
+								printf '%s\n' "${pr_offset}for family in $families; do"
+								inc_pr_offset
+							}
+						else
+							families="${key#"FILTERS_IPV"}"
+							families="${families:+"ipv${families}"}"
+						fi
+						if [ -z "$TRANSLATE_TO_NO_JSON" ]; then
+							for family in $families; do
+								create_filters "$class_enums" "$tc_obj_id" "$family" || return 1
+							done
+						else
+							printf '%s\n' \
+								"${pr_offset}create_filters \"$class_enums\" \"$tc_obj_id\" \"\$family\" || return 1"
+							[ "$key" = FILTERS ] && {
+								dec_pr_offset
+								printf '%s\n' "${pr_offset}done &&"
+							}
+						fi ;;
 					*) json_err "Unexpected array '$key'"; return 1
 				esac ;;
 			*) json_err "Unexpected object type '$json_child_type'." "$key"; return 1
 		esac || return 1
 	done
+
+	case "$req_pr_str" in
+		'') ;;
+		*"${obj_req_str}")
+			[ -n "$obj_req_str" ] && {
+				req_pr_str="${req_pr_str%"${obj_req_str}"}"
+				dec_pr_offset
+				echo "${pr_offset%    }esac"
+			}
+	esac
 
 	case "$json_obj" in
 		ROOT) ;;
