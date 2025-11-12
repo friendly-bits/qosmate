@@ -21,31 +21,31 @@ apply_rules_no_json() {
 
 		create_class "hfsc_main_link" "1:1" "1:" &&
 
-			create_class "hfsc_tin fast" "1:12" "1:1" &&
+			create_class "hfsc_tin fast" "1:12" "1:" &&
 				create_qdisc "hfsc_non_game" "" "1:12" &&
 				for family in ipv4 ipv6; do
 					create_filters "CS4 AF41 AF42" "1:12" "$family" || return 1
 				done &&
 
-			create_class "hfsc_tin normal" "1:13" "1:1" &&
+			create_class "hfsc_tin normal" "1:13" "1:" &&
 				create_qdisc "hfsc_non_game" "" "1:13" &&
 				for family in ipv4 ipv6; do
 					create_filters "CS0" "1:13" "$family" || return 1
 				done &&
 
-			create_class "hfsc_tin lowprio" "1:14" "1:1" &&
+			create_class "hfsc_tin lowprio" "1:14" "1:" &&
 				create_qdisc "hfsc_non_game" "" "1:14" &&
 				for family in ipv4 ipv6; do
 					create_filters "CS2 AF11" "1:14" "$family" || return 1
 				done &&
 
-			create_class "hfsc_tin bulk" "1:15" "1:1" &&
+			create_class "hfsc_tin bulk" "1:15" "1:" &&
 				create_qdisc "hfsc_non_game" "" "1:15" &&
 				for family in ipv4 ipv6; do
 					create_filters "CS1" "1:15" "$family" || return 1
 				done &&
 
-			create_class "hfsc_tin realtime" "1:11" "1:15" &&
+			create_class "hfsc_tin realtime" "1:11" "1:" &&
 				create_qdisc "hfsc_game" "10:" "1:11" &&
 					case "$gameqdisc" in
 						drr|qfq)
