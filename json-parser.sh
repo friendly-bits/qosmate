@@ -98,9 +98,41 @@ get_child_keys() {
 	:
 }
 
+print_no_json_line() {
+	local no_err=
+	[ "$1" = "-no_err" ] && { no_err=1; shift; }
+	[ -n "$prev_line_err_check_req" ] && printf '%s\n' " &&"
+	printf '%s' "${pr_offset}${1}"
+	prev_line_err_check_req=1
+	[ -n "$no_err" ] && { prev_line_err_check_req=''; printf '\n'; }
+}
+
+
+get_match_var() {
+	local match_var
+	case "$2" in
+		direction) match_var="DIR" ;;
+		gameqdisc) match_var="gameqdisc" ;;
+		*) false
+	esac || return 1
+	eval "$1=\"$match_var\""
+}
+
+# req match helper
+test_req_match() {
+	local test_val var key="$1" val="$2"
+	[ -n "$key" ] && [ -n "$val" ] &&
+	get_match_var var "$key" &&
+	eval "test_val=\"\${$var}\"" || return 2
+
+	[ "$val" = "$test_val" ]
+}
+
+
 traverse_obj() {
 	local tc_obj_id='' \
-		obj_req_str='' \
+		condition_hier_ind="${condition_hier_ind:-0}" \
+		condition_json_path='' \
 		json_obj_cnt=0 json_child_type key val child_keys='' family families class_enums \
 		req_key req_val req_vals \
 		pr_offset="$pr_offset" \
@@ -183,9 +215,12 @@ traverse_obj() {
 						req_vals="${req_vals#=}"
 
 						if [ -n "$TRANSLATE_TO_NO_JSON" ]; then
-							echo "${pr_offset}case \"${req_key}\" in ${req_vals})"
-							obj_req_str="${val}: "
-							req_pr_str="${req_pr_str:+ }${obj_req_str}"
+							local var
+							get_match_var var "$req_key"
+							print_no_json_line -no_err "case \"\$$var\" in ${req_vals})"
+							prev_line_err_check_req=''
+							condition_hier_ind=$((condition_hier_ind+1))
+							eval "condition_json_path_${condition_hier_ind}=\"$JSON_PATH\""
 							inc_pr_offset
 							continue
 						fi
@@ -212,7 +247,7 @@ traverse_obj() {
 								QDISC) tc_obj_type_lc=qdisc ;;
 								*) json_err "Unexpected tc obj type '$tc_obj_type'."; return 1
 							esac
-							echo "${pr_offset}create_${tc_obj_type_lc} \"$val\" \"$tc_obj_id\" \"$tc_parent_obj_id\" &&"
+							print_no_json_line "create_${tc_obj_type_lc} \"$val\" \"$tc_obj_id\" \"$tc_parent_obj_id\""
 						fi
 						inc_pr_offset
 						continue ;;
@@ -227,40 +262,43 @@ traverse_obj() {
 						if [ "$key" = FILTERS ]; then
 							families="ipv4 ipv6"
 							[ -n "$TRANSLATE_TO_NO_JSON" ] && {
-								printf '%s\n' "${pr_offset}for family in $families; do"
+								print_no_json_line -no_err "for family in $families; do"
 								inc_pr_offset
 							}
 						else
-							families="${key#"FILTERS_IPV"}"
-							families="${families:+"ipv${families}"}"
+							families="ipv${key#"FILTERS_IPV"}"
 						fi
+
 						if [ -z "$TRANSLATE_TO_NO_JSON" ]; then
 							for family in $families; do
 								create_filters "$class_enums" "$tc_obj_id" "$family" || return 1
 							done
 						else
-							printf '%s\n' \
-								"${pr_offset}create_filters \"$class_enums\" \"$tc_obj_id\" \"\$family\" || return 1"
+							print_no_json_line -no_err \
+								"create_filters \"$class_enums\" \"$tc_obj_id\" \"\$family\" || return 1"
 							[ "$key" = FILTERS ] && {
 								dec_pr_offset
-								printf '%s\n' "${pr_offset}done &&"
+								print_no_json_line "done"
 							}
-						fi ;;
+						fi
+						continue ;;
 					*) json_err "Unexpected array '$key'"; return 1
 				esac ;;
 			*) json_err "Unexpected object type '$json_child_type'." "$key"; return 1
 		esac || return 1
 	done
 
-	case "$req_pr_str" in
-		'') ;;
-		*"${obj_req_str}")
-			[ -n "$obj_req_str" ] && {
-				req_pr_str="${req_pr_str%"${obj_req_str}"}"
-				dec_pr_offset
-				echo "${pr_offset%    }esac"
-			}
-	esac
+	[ -n "$TRANSLATE_TO_NO_JSON" ] && {
+		eval "condition_json_path=\"\${condition_json_path_${condition_hier_ind}}\""
+		if [ "$JSON_PATH" = "$condition_json_path" ]; then
+			dec_pr_offset
+			dec_pr_offset
+			prev_line_err_check_req=
+			printf '\n'
+			print_no_json_line "esac"
+			unset "condition_json_path_${condition_hier_ind}"
+		fi
+	}
 
 	case "$json_obj" in
 		ROOT) ;;
@@ -280,4 +318,5 @@ init_json_parser() {
 
 parse_json() {
 	traverse_obj "ROOT"
+	[ -n "$TRANSLATE_TO_NO_JSON" ] && printf '\n'
 }
