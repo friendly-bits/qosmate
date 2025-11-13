@@ -3,7 +3,7 @@
 	"comment": "Read JSON-RULES.md for info about the format",
 
 	"QDISC_1": {
-		"helper": "root",
+		"helper": "hfsc_root",
 
 		"CLASS_1_2": {
 			"requires": "direction=DOWN",

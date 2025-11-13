@@ -84,7 +84,7 @@ game_drr_qfq_class_helper() {
 
 ## QDISC HELPERS
 
-root_qdisc_helper() {
+hfsc_root_qdisc_helper() {
 	local oh_params
 	get_tc_overhead_params oh_params || return 1
 	PARAMS="root $oh_params hfsc default 13"
@@ -359,7 +359,7 @@ create_tc_obj() {
 	case "$tc_obj_type" in
 		QDISC)
 			case "$helper_short" in
-				root|hfsc_game|hfsc_non_game|cake|fq_codel|red)
+				hfsc_root|hfsc_game|hfsc_non_game|cake|fq_codel|red)
 					${helper_short}_qdisc_helper ${helper_args} ;;
 				*) unexp_func=1; false
 			esac &&
