@@ -19,20 +19,6 @@ print_msg() {
 error_out() { print_msg "${@}"; }
 
 
-## Req match helper
-test_req_match() {
-	local test_val key="$1" val="$2"
-	[ -n "$key" ] && [ -n "$val" ] &&
-	case "$key" in
-		direction) test_val="$DIR" ;;
-		gameqdisc) test_val="$gameqdisc" ;;
-		*) false
-	esac || return 2
-
-	[ "$test_val" = "$val" ]
-}
-
-
 ## CLASS HELPERS
 
 hfsc_lan_class_helper() {
