@@ -1,0 +1,54 @@
+{
+	"comment": "Read JSON-RULES.md for info about the format",
+
+	"QDISC_1": {
+		"helper": "hfsc_root",
+
+		"CLASS_1_2": {
+			"requires": "direction=DOWN",
+			"helper": "hfsc_lan"
+		},
+
+		"CLASS_1_1": {
+			"helper": "hfsc_main_link",
+
+			"CLASS_1_13": {
+				"helper": "hybrid_tin normal",
+				"QDISC_13": { "helper": "hybrid_cake" },
+				"FILTERS_IPV6": [ "CS0" ]
+			},
+
+			"CLASS_1_15": {
+				"helper": "hybrid_tin bulk",
+				"QDISC_15": { "helper": "fq_codel -mem-coeff 1" },
+				"FILTERS": [ "CS1" ]
+			},
+
+			"CLASS_1_11": {
+				"helper": "hfsc_tin realtime",
+
+				"FILTERS": [ "EF", "CS5", "CS6", "CS7" ],
+
+				"QDISC_10": {
+					"helper": "hfsc_game",
+
+					"CLASS_10_1": {
+						"requires": "gameqdisc=drr|qfq",
+						"helper": "game_drr_qfq 8000",
+						"QDISC_11": { "helper": "red" }
+					},
+					"CLASS_10_2": {
+						"requires": "gameqdisc=drr|qfq",
+						"helper": "game_drr_qfq 4000",
+						"QDISC_12": { "helper": "red" }
+					},
+					"CLASS_10_3": {
+						"requires": "gameqdisc=drr|qfq",
+						"helper": "game_drr_qfq 1000",
+						"QDISC_13": { "helper": "red" }
+					}
+				}
+			}
+		}
+	}
+}
