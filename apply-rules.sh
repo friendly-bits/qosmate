@@ -503,8 +503,6 @@ setup_hfsc_hybrid() {
 			gameqdisc="pfifo" ;; # Revert to a simple default as fallback
 	esac
 
-	[ -n "$USE_JSON" ] && [ -n "$TRANSLATE_TO_NO_JSON" ] && directions=DOWN
-
 	# shellcheck source=/dev/null
 	[ -n "$USE_JSON" ] || . "${no_json_script}"
 
@@ -550,12 +548,8 @@ setup_hfsc_hybrid() {
 	:
 }
 
-
 # Add a value to use the json implementation
 USE_JSON=
-
-# Add a value to only print json-to-jsonless translation when USE_JSON is set
-TRANSLATE_TO_NO_JSON=1
 
 hfsc_json_file="${script_dir}/hfsc-rules.json"
 hybrid_json_file="${script_dir}/hybrid-rules.json"
@@ -563,7 +557,7 @@ no_json_script="${script_dir}/rules-no-json.sh"
 
 if [ -n "$USE_JSON" ]; then
 	echo "!!! USING JSON IMPLEMENTATION !!!"
-	. "${script_dir}/json-parser.sh"
+	APPLY_SOURCED=1 . "${script_dir}/json-parser.sh"
 else
 	echo "!!! USING JSON-LESS IMPLEMENTATION !!!"
 fi
@@ -604,12 +598,12 @@ case "$ROOT_QDISC" in
 	hfsc|hybrid) ;;
 	cake|htb)
 		error_out "Support for $ROOT_QDISC not implemented!"; exit 1 ;;
-    *)
+	*)
 		# Fallback for unsupported ROOT_QDISC
-        print_msg -err "Unsupported ROOT_QDISC: '$ROOT_QDISC'. Check /etc/config/qosmate."
-        print_msg -warn "Falling back to default HFSC mode with pfifo game qdisc."
-        ROOT_QDISC="hfsc"
-        gameqdisc="pfifo" # Safe default for fallback
+		print_msg -err "Unsupported ROOT_QDISC: '$ROOT_QDISC'. Check /etc/config/qosmate."
+		print_msg -warn "Falling back to default HFSC mode with pfifo game qdisc."
+		ROOT_QDISC="hfsc"
+		gameqdisc="pfifo" # Safe default for fallback
 esac
 
 print_msg "Applying $ROOT_QDISC queueing discipline."
