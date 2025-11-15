@@ -67,6 +67,19 @@ log_msg() {
 
 config_load 'qosmate' || { error_out "Failed to get UCI config."; exit 1; }
 
+# Root qdisc
+case "$ROOT_QDISC" in
+	hfsc|hybrid) ;;
+	cake|htb)
+		error_out "Support for $ROOT_QDISC not implemented!"; exit 1 ;;
+	*)
+		# Fallback for unsupported ROOT_QDISC
+		print_msg -err "Unsupported ROOT_QDISC: '$ROOT_QDISC'. Check /etc/config/qosmate."
+		print_msg -warn "Falling back to default HFSC mode with pfifo game qdisc."
+		ROOT_QDISC="hfsc"
+		gameqdisc="pfifo" # Safe default for fallback
+esac
+
 
 ##############################
 # Variable checks and dynamic rule generation
@@ -1191,3 +1204,12 @@ your gaming, and there is NOTHING that your router can do about it.
 
 EOF
 
+
+####################
+#     QoS Setup
+####################
+
+# shellcheck source=/dev/null
+. "$QOSMATE_TC_LIB" &&
+setup_tc
+exit $?
