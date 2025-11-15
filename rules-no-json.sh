@@ -100,4 +100,4 @@ apply_rules_hybrid() {
 						create_class "game_drr_qfq 1000" "10:3" "10:" &&
 							create_qdisc "red" "13:" "10:3"
 					esac
-	}
+}
