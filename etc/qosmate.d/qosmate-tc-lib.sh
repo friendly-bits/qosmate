@@ -299,7 +299,7 @@ setup_tc() {
 	## Set up ctinfo for upstream (egress) - SFO compatibility
 	# Restore DSCP values from conntrack for egress packets
 	# Only needed when Software Flow Offloading is active
-	if [ "$SFO_ENABLED" = "1" ]; then
+	if [ "$(uci -q get firewall.@defaults[0].flow_offloading)" = "1" ]; then
 		print_msg "" "Software Flow Offloading detected - enabling SFO compatibility mode..."
 		tc filter add dev "$WAN" parent 1: protocol all matchall action ctinfo dscp 63 128 continue
 	else
