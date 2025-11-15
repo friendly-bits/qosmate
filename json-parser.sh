@@ -6,15 +6,17 @@ _NL_='
 DEFAULT_IFS=" 	${_NL_}"
 IFS="$DEFAULT_IFS"
 
+PR_OFFSET_UNIT="    "
 
 json_err() {
+	printf '\n'
 	[ -z "$ERR_PATH_REPORTED" ] && error_out "At json path '${JSON_PATH}${2:+":"}${2}'"
 	ERR_PATH_REPORTED=1
 	[ -n "$1" ] && error_out "$1"
 }
 
-inc_pr_offset() { pr_offset="${pr_offset}    "; }
-dec_pr_offset() { pr_offset="${pr_offset%    }"; }
+inc_pr_offset() { pr_offset="${pr_offset}${PR_OFFSET_UNIT}"; }
+dec_pr_offset() { pr_offset="${pr_offset%"${PR_OFFSET_UNIT}"}"; }
 
 json_select_h() {
 	case "$1" in
@@ -114,7 +116,7 @@ get_match_var() {
 		direction) match_var="DIR" ;;
 		gameqdisc) match_var="gameqdisc" ;;
 		*) false
-	esac || return 1
+	esac || { json_err "Unexpected 'requires' match '$2'"; return 1; }
 	eval "$1=\"$match_var\""
 }
 
@@ -162,6 +164,7 @@ traverse_obj() {
 
 	case "$json_obj" in
 		ROOT) ;;
+		LOGIC_BRANCH*) local REQUIRES_EXPECTED=1 ;;
 		QDISC*|CLASS_*)
 			local HELPER_REQ=1 REQUIRES_EXPECTED=1
 
@@ -197,15 +200,17 @@ traverse_obj() {
 					json_err "No helper specified for object '$json_obj'."
 					return 1
 				} ;;
+			LOGIC_BRANCH*) ;;
 			*) false			
 		esac || { json_err "'$key' is not expected here."; return 1; }
 
 		case "$json_child_type" in
 			object)
 				case "$key" in
-					QDISC*|CLASS_*) traverse_obj "$key" "$traverse_parent_id" ;;
-					*) json_err "Unexpected key '$key'"; return 1
-				esac ;;
+					QDISC*|CLASS_*|LOGIC_BRANCH*) traverse_obj "$key" "$traverse_parent_id" ;;
+					*) json_err "Unexpected key '$key'"; false
+				esac || return 1
+				continue ;;
 			string)
 				get_json_var val "$key" || return 1
 				case "$key" in
@@ -216,7 +221,7 @@ traverse_obj() {
 
 						if [ -n "$TRANSLATE_TO_NO_JSON" ]; then
 							local var
-							get_match_var var "$req_key"
+							get_match_var var "$req_key" || return 1
 							print_no_json_line -no_err "case \"\$$var\" in ${req_vals})"
 							prev_line_err_check_req=''
 							condition_hier_ind=$((condition_hier_ind+1))
@@ -254,36 +259,35 @@ traverse_obj() {
 					*)
 						json_err "Unexpected string/int key '$key'"
 						return 1
-				esac ;;
+				esac
+				continue ;;
 			array)
 				get_json_arr class_enums "$key" || return 1
 				case "$key" in
-					FILTERS|FILTERS_IPV4|FILTERS_IPV6)
-						if [ "$key" = FILTERS ]; then
-							families="ipv4 ipv6"
-							[ -n "$TRANSLATE_TO_NO_JSON" ] && {
-								print_no_json_line -no_err "for family in $families; do"
-								inc_pr_offset
-							}
-						else
-							families="ipv${key#"FILTERS_IPV"}"
-						fi
-
+					FILTERS)
+						families="ipv4 ipv6"
 						if [ -z "$TRANSLATE_TO_NO_JSON" ]; then
 							for family in $families; do
 								create_filters "$class_enums" "$tc_obj_id" "$family" || return 1
 							done
 						else
+							print_no_json_line -no_err "for family in $families; do"
 							print_no_json_line -no_err \
-								"create_filters \"$class_enums\" \"$tc_obj_id\" \"\$family\" || return 1"
-							[ "$key" = FILTERS ] && {
-								dec_pr_offset
-								print_no_json_line "done"
-							}
-						fi
-						continue ;;
+								"${PR_OFFSET_UNIT}create_filters \"$class_enums\" \"$tc_obj_id\" \"\$family\" || return 1"
+							print_no_json_line "done"
+						fi ;;
+					FILTERS_IPV4|FILTERS_IPV6)
+						family="ipv${key#"FILTERS_IPV"}"
+
+						if [ -z "$TRANSLATE_TO_NO_JSON" ]; then
+							create_filters "$class_enums" "$tc_obj_id" "$family" || return 1
+						else
+							print_no_json_line -no_err \
+								"create_filters \"$class_enums\" \"$tc_obj_id\" \"$family\" || return 1"
+						fi ;;
 					*) json_err "Unexpected array '$key'"; return 1
-				esac ;;
+				esac
+				continue ;;
 			*) json_err "Unexpected object type '$json_child_type'." "$key"; return 1
 		esac || return 1
 	done
@@ -310,13 +314,30 @@ traverse_obj() {
 
 init_json_parser() {
 	# shellcheck source=/dev/null
-	. /usr/share/libubox/jshn.sh &&
-	json_load_file "${1}" || { json_err "Failed to load file '$1'."; exit 1; }
+	. /usr/share/libubox/jshn.sh || { error_out "Failed to source jshn.sh"; return 1; }
+	[ -e "$1" ] || { error_out "No json file specified."; return 1; }
+	json_load_file "${1}" || { error_out "Failed to load json file '$1'."; return 1; }
 
 	JSON_PATH="ROOT"
 }
 
 parse_json() {
 	traverse_obj "ROOT"
-	[ -n "$TRANSLATE_TO_NO_JSON" ] && printf '\n'
 }
+
+
+TRANSLATE_TO_NO_JSON=
+if [ -z "$APPLY_SOURCED" ]; then
+	error_out() {
+		printf '%s\n' "$*" >&2
+	}
+
+	TRANSLATE_TO_NO_JSON=1
+
+	init_json_parser "$1" &&
+	parse_json &&
+	printf '\n'
+	exit $?
+fi
+
+:
