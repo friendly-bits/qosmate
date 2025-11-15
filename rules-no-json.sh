@@ -19,7 +19,9 @@ create_qdisc() {
 apply_rules_hfsc() {
 	create_qdisc "hfsc_root" "1:" "root" &&
 
-		{ [ "$DIR" = UP ] || create_class "hfsc_lan" "1:2" "1:" ; } &&
+		case "$DIR" in DOWN)
+			create_class "hfsc_lan" "1:2" "1:"
+		esac &&
 
 		create_class "hfsc_main_link" "1:1" "1:" &&
 
