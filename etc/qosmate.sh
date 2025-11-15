@@ -67,14 +67,6 @@ log_msg() {
 
 config_load 'qosmate' || { error_out "Failed to get UCI config."; exit 1; }
 
-# Check if Software Flow Offloading is enabled
-SFO_ENABLED=0
-[ "$(uci -q get firewall.@defaults[0].flow_offloading)" = "1" ] && SFO_ENABLED=1
-
-# Calculated values
-FIRST500MS=$((DOWNRATE * 500 / 8))
-FIRST10S=$((DOWNRATE * 10000 / 8))
-
 
 ##############################
 # Variable checks and dynamic rule generation
@@ -981,6 +973,10 @@ fi
 ##############################
 #       dscptag.nft
 ##############################
+
+# Calculated values
+FIRST500MS=$((DOWNRATE * 500 / 8))
+FIRST10S=$((DOWNRATE * 10000 / 8))
 
 ## Check if the folder does not exist
 if [ ! -d "/usr/share/nftables.d/ruleset-post" ]; then
