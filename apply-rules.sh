@@ -33,24 +33,69 @@ hfsc_main_link_class_helper() {
 }
 
 hfsc_tin_class_helper() {
-	local burst_percent steady_percent \
-		base_burst_rate="$NON_GAME_RATE" \
-		base_steady_rate="$NON_GAME_RATE"
+	local base_steady_rate="$NON_GAME_RATE" \
+		steady_percent \
+		base_burst_rate burst_percent
 
 	case "$1" in
-		realtime) base_burst_rate="$GAME_BURST_RATE" burst_percent=100 steady_percent=100 ;;
-		fast) burst_percent=70 steady_percent=30 ;;
-		normal) burst_percent=20 steady_percent=45 ;;
-		lowprio) burst_percent=7 steady_percent=15 ;;
-		bulk) burst_percent=3 steady_percent=15 ;;
+		realtime)
+			steady_percent=100
+			base_burst_rate="$GAME_BURST_RATE"
+			burst_percent=100 ;;
+		fast)
+			steady_percent=30
+			base_burst_rate="$NON_GAME_RATE"
+			burst_percent=70 ;;
+		normal)
+			steady_percent=45
+			base_burst_rate="$NON_GAME_RATE"
+			burst_percent=20 ;;
+		lowprio)
+			steady_percent=15
+			base_burst_rate="$NON_GAME_RATE"
+			burst_percent=7 ;;
+		bulk)
+			steady_percent=15
+			base_burst_rate="$NON_GAME_RATE"
+			burst_percent=3 ;;
 		*) # TODO: throw error
 	esac
 
 	append_params "hfsc" &&
 	append_curve_params "linkshare" \
+		"steady_rate:$((base_steady_rate*steady_percent/100))" \
 		"burst_rate:$((base_burst_rate*burst_percent/100))" \
-		"burst_dur:$BURST_DUR" \
-		"steady_rate:$((base_steady_rate*steady_percent/100))"
+		"burst_dur:$BURST_DUR"
+}
+
+hybrid_tin_class_helper() {
+	local \
+		base_steady_rate steady_percent \
+		base_burst_rate burst_percent \
+		normal_rate
+
+	case "$1" in
+		normal)
+			normal_rate=$((NON_GAME_RATE - GAMERATE))
+			[ $normal_rate -gt 0 ] || normal_rate=1
+			base_steady_rate=$normal_rate
+			steady_percent=100
+			base_burst_rate=$normal_rate
+			burst_percent=100
+			;;
+		bulk)
+			base_steady_rate=$NON_GAME_RATE
+			steady_percent=10
+			base_burst_rate=$NON_GAME_RATE
+			burst_percent=3 ;;
+		*) # TODO: throw error
+	esac
+
+	append_params "hfsc" &&
+	append_curve_params "linkshare" \
+		"steady_rate:$((base_steady_rate*steady_percent/100))" \
+		"burst_rate:$((base_burst_rate*burst_percent/100))" \
+		"burst_dur:$BURST_DUR"
 }
 
 game_drr_qfq_class_helper() {
@@ -70,6 +115,26 @@ game_drr_qfq_class_helper() {
 
 ## QDISC HELPERS
 
+# Get CAKE parameters from common link settings
+# $3 = "-hybrid" to force manual overhead for consistency with HFSC
+get_cake_link_params() {
+	local _oh="$OVERHEAD" _link="$COMMON_LINK_PRESETS"
+
+    # Determine link keyword and default overhead
+    case "$_link" in
+        *atm*|*adsl*|*pppoa*|*pppoe*|*bridged*|*ipoa*|conservative)
+            [ "$3" = "-hybrid" ] && _link="atm"
+            : "${_oh:=44}"
+            ;;
+        docsis)        : "${_oh:=25}" ;;
+        raw)           : "${_oh:=0}"  ;;
+        cake-ethernet) _link="ethernet"; : "${_oh:=38}" ; [ "$3" = "-hybrid" ] || _oh="" ;;
+        ethernet|*)    _link="ethernet"; : "${_oh:=40}" ;;
+    esac
+	eval "$1=\"\$_link\" $2=\"\$_oh\""
+}
+
+
 hfsc_root_qdisc_helper() {
 	local oh_params
 	get_tc_overhead_params oh_params || return 1
@@ -78,7 +143,7 @@ hfsc_root_qdisc_helper() {
 
 hfsc_non_game_qdisc_helper() {
 	case "$nongameqdisc" in
-		cake) cake_qdisc_helper ;;
+		cake) hfsc_cake_qdisc_helper ;;
 		fq_codel) fq_codel_qdisc_helper ;;
 	esac
 }
@@ -95,10 +160,39 @@ hfsc_game_qdisc_helper() {
 	esac
 }
 
-cake_qdisc_helper() {
+hfsc_cake_qdisc_helper() {
 	append_params \
 		"cake" \
 		"extra:$nongameqdiscoptions"
+}
+
+hybrid_cake_qdisc_helper() {
+	local link oh
+	get_cake_link_params link oh -hybrid
+	append_params "cake" || return 1
+	case "$DIR" in
+		UP)
+			append_params \
+				"extra:besteffort" \
+				"extra:$EXTRA_PARAMETERS_EGRESS" \
+				"dual_srchost:$HOST_ISOLATION" \
+				"nat:$NAT_EGRESS" \
+				"wash:$WASHDSCPUP" ;;
+		DOWN)
+			append_params \
+				"extra:besteffort ingress" \
+				"extra:$EXTRA_PARAMETERS_INGRESS" \
+				"dual_dsthost:$HOST_ISOLATION" \
+				"nat:$NAT_INRESS" \
+				"wash:$WASHDSCPDOWN"
+	esac
+	append_params \
+		"rtt:$RTT" \
+		"link:$link" \
+		"overhead:$oh" \
+		"mpu:$MPU" \
+		"extra:$ETHER_VLAN_KEYWORD" \
+		"extra:$LINK_COMPENSATION"
 }
 
 netem_qdisc_helper() {
@@ -245,6 +339,9 @@ append_curve_params() {
 		val="${param#*":"}" &&
 		[ -n "$key" ] && [ -n "$val" ] &&
 		case "$key" in
+			steady_rate|burst_rate) [ "$val" -gt 0 ] || val=1
+		esac &&
+		case "$key" in
 			burst_dur) burst_dur=" d ${val}ms" ;;
 			burst_rate) burst_rate="m1 ${val}kbit" ;;
 			steady_rate) steady_rate="m2 ${val}kbit" ;;
@@ -262,26 +359,6 @@ append_curve_params() {
 	append_param "${curve}:${params_str}"
 }
 
-
-# Set CAKE parameters from common link settings
-# $1 = "hybrid" to force manual overhead for consistency with HFSC
-cake_link_params_helper() {
-	CAKE_OH="$OVERHEAD"
-	LINK="$COMMON_LINK_PRESETS"
-
-    # Determine link keyword and default overhead
-    case "$LINK" in
-        *atm*|*adsl*|*pppoa*|*pppoe*|*bridged*|*ipoa*|conservative)
-            [ "$1" = "hybrid" ] && LINK="atm"
-            : "${CAKE_OH:=44}"
-            ;;
-        docsis)        : "${CAKE_OH:=25}" ;;
-        raw)           : "${CAKE_OH:=0}"  ;;
-        cake-ethernet) LINK="ethernet"; : "${CAKE_OH:=38}" ; [ "$1" = "hybrid" ] || CAKE_OH="" ;;
-        ethernet|*)    LINK="ethernet"; : "${CAKE_OH:=40}" ;;
-    esac
-	:
-}
 
 # Set tc stab parameters for HFSC/HTB/Hybrid
 get_tc_overhead_params() {
@@ -304,16 +381,6 @@ get_tc_overhead_params() {
 }
 
 
-hybrid_params_helper() {
-	CAKE_RATE=$((NON_GAME_RATE - GAMERATE))
-	[ $CAKE_RATE -gt 0 ] || CAKE_RATE=1
-}
-
-hybrid_bulk_helper() {
-    BULK_RATE_BURST=$((RATE*3/100)); [ $BULK_RATE_BURST -le 0 ] && BULK_RATE_BURST=1
-    BULK_RATE_STEADY=$((RATE*10/100)); [ $BULK_RATE_STEADY -le 0 ] && BULK_RATE_STEADY=1
-}
-
 
 ## TC OBJECTS AND FILTERS
 
@@ -321,7 +388,7 @@ create_tc_obj() {
 	inval_obj() { error_out "create_tc_obj: Invalid object id '$tc_obj_id'"; }
 	inval_parent() { error_out "create_tc_obj: Invalid parent id '$tc_parent_id' for object '$tc_obj_id'"; }
 
-	local helper_short helper_func helper_args unexp_func='' PARAMS='' \
+	local helper_short helper_args unexp_func='' PARAMS='' \
 		helper_str="$1" tc_obj_type="$2" tc_obj_id="$3" tc_parent_id="$4"
 
 	[ -n "$helper_str" ] || { error_out "Helper function not specified!"; return 1; }
@@ -345,14 +412,18 @@ create_tc_obj() {
 	case "$tc_obj_type" in
 		QDISC)
 			case "$helper_short" in
-				hfsc_root|hfsc_game|hfsc_non_game|cake|fq_codel|red)
+				hfsc_root|hfsc_game|hfsc_non_game|\
+				hybrid_cake|\
+				cake|fq_codel|red)
 					${helper_short}_qdisc_helper ${helper_args} ;;
 				*) unexp_func=1; false
 			esac &&
 			echo "tc qdisc add dev \"$DEV\"${tc_parent_id:+ parent }${tc_parent_id}${tc_obj_id:+ handle }${tc_obj_id} ${PARAMS}" ;;
 		CLASS)
 			case "$helper_short" in
-				hfsc_lan|hfsc_main_link|hfsc_tin|game_drr_qfq)
+				hfsc_lan|hfsc_main_link|hfsc_tin|\
+				hybrid_tin|\
+				game_drr_qfq)
 					${helper_short}_class_helper ${helper_args} ;;
 				*) unexp_func=1; false
 			esac &&
@@ -360,7 +431,7 @@ create_tc_obj() {
 		*) false
 	esac ||
 		{
-			[ -n "$unexp_func" ] && error_out "Unexpected helper '$helper_func'."
+			[ -n "$unexp_func" ] && error_out "Unexpected helper '$helper_short'."
 			error_out "Failed to create tc object with type '$tc_obj_type', ID '$tc_obj_id'."
 			return 1
 		}
@@ -404,64 +475,77 @@ create_filters() {
 
 
 
-## MAIN CONSTRUCTORS
+setup_hfsc_hybrid() {
+	apply_hfsc_hybrid_rules() {
+		local file
+		if [ -n "$USE_JSON" ]; then
+			case "$1" in
+				hfsc) file="$hfsc_json_file" ;;
+				hybrid) file="$hybrid_json_file" ;;
+				*) error_out "apply_hfsc_hybrid_rules: unexpected qdisc '$1'"; return 1
+			esac
+			init_json_parser "$file" &&
+			parse_json
+		else
+			"apply_rules_${1}"
+		fi
+	}
 
-setup_hfsc_dir() {
-	local max_burst_rate min_burst_dur \
-		dir="$1"
+	local DIR directions="UP DOWN" \
+		max_burst_rate min_burst_dur \
+		DEV NON_GAME_RATE GAMERATE GAME_BURST_RATE BURST_DUR
 
-	case "$dir" in
-		UP)
-			DEV="$WAN"
-			GAMERATE="$GAMEUP"
-			NON_GAME_RATE="$UPRATE" ;;
-		DOWN)
-			DEV="$LAN"
-			GAMERATE="$GAMEDOWN"
-			NON_GAME_RATE="$DOWNRATE" ;;
+	# Validate gameqdisc choice (used by HFSC and Hybrid)
+	case "$gameqdisc" in
+		drr|qfq|pfifo|bfifo|red|fq_codel|netem) ;; # Supported game qdiscs
+		*)
+			print_msg -warn "Unsupported gameqdisc '$gameqdisc' selected in config. Using pfifo fallback."
+			gameqdisc="pfifo" ;; # Revert to a simple default as fallback
 	esac
 
-	# Ensure rates/packetsize are non-zero to avoid errors in calculations
-	[ "$NON_GAME_RATE" -gt 0 ] || NON_GAME_RATE=1
-	[ "$GAMERATE" -gt 0 ] || GAMERATE=1
-	[ "$PACKETSIZE" -gt 0 ] || PACKETSIZE=1
-
-	min_burst_dur=25
-	BURST_DUR=$((5*1500*8/NON_GAME_RATE))
-	[ $BURST_DUR -ge $min_burst_dur ] ||
-		BURST_DUR=$min_burst_dur
-
-	max_burst_rate=$((NON_GAME_RATE*97/100))
-	GAME_BURST_RATE=$((GAMERATE*10))
-	[ $GAME_BURST_RATE -le $max_burst_rate ] ||
-		GAME_BURST_RATE=$max_burst_rate
-
-	if [ "$gameqdisc" = "netem" ]; then
-		# Only apply NETEM if this direction is enabled
-		case "$NETEM_DIRECTION" in
-			both) : ;;
-			egress) [ "$dir" = "UP" ] ;;
-			ingress) [ "$dir" = "DOWN" ] ;;
-			*) false ;; # TODO: Error out
-		esac || gameqdisc=pfifo
-	fi
-}
-
-apply_hfsc_rules() {
-	if [ -n "$USE_JSON" ]; then
-		init_json_parser "${1:-"$TEST_JSON"}" &&
-		parse_json
-	else
-		apply_rules_no_json
-	fi
-}
-
-setup_hfsc() {
-	local DIR directions="UP DOWN"
 	[ -n "$USE_JSON" ] && [ -n "$TRANSLATE_TO_NO_JSON" ] && directions=DOWN
+
+	# shellcheck source=/dev/null
+	[ -n "$USE_JSON" ] || . "${no_json_script}"
+
 	for DIR in $directions; do
-		setup_hfsc_dir "$DIR" &&
-		apply_hfsc_rules "$@" || exit 1
+		case "$DIR" in
+			UP)
+				DEV="$WAN"
+				GAMERATE="$GAMEUP"
+				NON_GAME_RATE="$UPRATE" ;;
+			DOWN)
+				DEV="$LAN"
+				GAMERATE="$GAMEDOWN"
+				NON_GAME_RATE="$DOWNRATE" ;;
+		esac
+
+		# Ensure rates/packetsize are non-zero to avoid errors in calculations
+		[ "$NON_GAME_RATE" -gt 0 ] || NON_GAME_RATE=1
+		[ "$GAMERATE" -gt 0 ] || GAMERATE=1
+		[ "$PACKETSIZE" -gt 0 ] || PACKETSIZE=1
+
+		min_burst_dur=25
+		BURST_DUR=$((5*1500*8/NON_GAME_RATE))
+		[ $BURST_DUR -ge $min_burst_dur ] ||
+			BURST_DUR=$min_burst_dur
+
+		max_burst_rate=$((NON_GAME_RATE*97/100))
+		GAME_BURST_RATE=$((GAMERATE*10))
+		[ $GAME_BURST_RATE -le $max_burst_rate ] ||
+			GAME_BURST_RATE=$max_burst_rate
+
+		if [ "$gameqdisc" = "netem" ]; then
+			# Only apply NETEM if this direction is enabled
+			case "$NETEM_DIRECTION" in
+				both) : ;;
+				egress) [ "$DIR" = "UP" ] ;;
+				ingress) [ "$DIR" = "DOWN" ] ;;
+				*) false ;; # TODO: Error out
+			esac || gameqdisc=pfifo
+		fi
+
+		apply_hfsc_hybrid_rules "$ROOT_QDISC" || exit 1
 	done
 	:
 }
@@ -473,19 +557,21 @@ USE_JSON=
 # Add a value to only print json-to-jsonless translation when USE_JSON is set
 TRANSLATE_TO_NO_JSON=1
 
+hfsc_json_file="${script_dir}/hfsc-rules.json"
+hybrid_json_file="${script_dir}/hybrid-rules.json"
+no_json_script="${script_dir}/rules-no-json.sh"
+
 if [ -n "$USE_JSON" ]; then
 	echo "!!! USING JSON IMPLEMENTATION !!!"
-	TEST_JSON="${script_dir}/${1:-"hfsc-rules.json"}"
 	. "${script_dir}/json-parser.sh"
 else
 	echo "!!! USING JSON-LESS IMPLEMENTATION !!!"
-	. "${script_dir}/hfsc-no-json.sh"
 fi
 
 
 # Hard-coded config vars
 
-ROOT_QDISC=hfsc
+ROOT_QDISC=hybrid
 gameqdisc=drr
 nongameqdisc=cake
 nongameqdiscoptions="besteffort ack-filter"
@@ -515,8 +601,8 @@ MTU=1500
 
 
 case "$ROOT_QDISC" in
-	hfsc) ;;
-	hybrid|cake|htb)
+	hfsc|hybrid) ;;
+	cake|htb)
 		error_out "Support for $ROOT_QDISC not implemented!"; exit 1 ;;
     *)
 		# Fallback for unsupported ROOT_QDISC
@@ -528,18 +614,6 @@ esac
 
 print_msg "Applying $ROOT_QDISC queueing discipline."
 
-# Validate gameqdisc choice (used by HFSC and Hybrid)
-case "$ROOT_QDISC" in hfsc|hybrid)
-    case "$gameqdisc" in
-        drr|qfq|pfifo|bfifo|red|fq_codel|netem) ;; # Supported game qdiscs
-        *)
-            print_msg -warn "Unsupported gameqdisc '$gameqdisc' selected in config. Using pfifo fallback."
-            gameqdisc="pfifo" # Revert to a simple default as fallback
-            ;;
-    esac
-esac
-
 case "$ROOT_QDISC" in
-	hfsc) setup_hfsc "$@" ;;
-	hybrid) setup_hybrid "$@"
+	hfsc|hybrid) setup_hfsc_hybrid ;;
 esac
