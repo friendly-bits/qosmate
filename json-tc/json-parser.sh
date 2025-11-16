@@ -91,7 +91,7 @@ get_child_keys() {
 	:
 }
 
-print_no_json_line() {
+print_transl_line() {
 	local no_err=
 	[ "$1" = "-no_err" ] && { no_err=1; shift; }
 	[ -n "$prev_line_err_check_req" ] && printf '%s\n' " &&"
@@ -202,7 +202,7 @@ traverse_obj() {
 						get_match_var match_var "$req_key" || return 1
 
 						if [ -n "$TRANSLATE_TO_SHELL" ]; then
-							print_no_json_line -no_err "case \"\$$match_var\" in ${req_vals})"
+							print_transl_line -no_err "case \"\$$match_var\" in ${req_vals})"
 							prev_line_err_check_req=''
 							condition_hier_ind=$((condition_hier_ind+1))
 							eval "condition_json_path_${condition_hier_ind}=\"$JSON_PATH\""
@@ -232,7 +232,7 @@ traverse_obj() {
 								QDISC) tc_obj_type_lc=qdisc ;;
 								*) json_err "Unexpected tc obj type '$tc_obj_type'."; return 1
 							esac
-							print_no_json_line "create_${tc_obj_type_lc} \"$val\" \"$tc_obj_id\" \"$tc_parent_obj_id\""
+							print_transl_line "create_${tc_obj_type_lc} \"$val\" \"$tc_obj_id\" \"$tc_parent_obj_id\""
 						fi
 						inc_pr_offset
 						continue ;;
@@ -251,10 +251,10 @@ traverse_obj() {
 								create_filters "$class_enums" "$tc_obj_id" "$family" || return 1
 							done
 						else
-							print_no_json_line -no_err "for family in $families; do"
-							print_no_json_line -no_err \
+							print_transl_line -no_err "for family in $families; do"
+							print_transl_line -no_err \
 								"${PR_OFFSET_UNIT}create_filters \"$class_enums\" \"$tc_obj_id\" \"\$family\" || return 1"
-							print_no_json_line "done"
+							print_transl_line "done"
 						fi ;;
 					FILTERS_IPV4|FILTERS_IPV6)
 						family="ipv${key#"FILTERS_IPV"}"
@@ -262,7 +262,7 @@ traverse_obj() {
 						if [ -z "$TRANSLATE_TO_SHELL" ]; then
 							create_filters "$class_enums" "$tc_obj_id" "$family" || return 1
 						else
-							print_no_json_line -no_err \
+							print_transl_line -no_err \
 								"create_filters \"$class_enums\" \"$tc_obj_id\" \"$family\" || return 1"
 						fi ;;
 					*) json_err "Unexpected array '$key'"; return 1
@@ -279,7 +279,7 @@ traverse_obj() {
 			dec_pr_offset
 			prev_line_err_check_req=
 			printf '\n'
-			print_no_json_line "esac"
+			print_transl_line "esac"
 			unset "condition_json_path_${condition_hier_ind}"
 		fi
 	}
