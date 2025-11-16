@@ -163,8 +163,6 @@ create_tc_obj() {
     local helper_short helper_args unexp_func='' PARAMS='' \
         helper_str="$1" tc_obj_type="$2" tc_obj_id="$3" tc_parent_id="$4"
 
-    [ -n "$helper_str" ] || { error_out "Helper function not specified!"; return 1; }
-
     case "$tc_obj_id" in
         *![0-9:]*) inval_obj; return 1 ;;
         ''|*[0-9]:*) ;;
