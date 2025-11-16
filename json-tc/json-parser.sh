@@ -219,7 +219,7 @@ traverse_obj() {
 							[ -n "$req_val" ] || { match_err=1; break; }
 							eval "[ \"\$req_val\" = \"\${$match_var}\" ]" && continue 2
 							continue
-						done || match_err=1
+						done
 						IFS="$DEFAULT_IFS"
 
 						[ -n "$match_err" ] && { json_err "Failed to parse 'requires' statement '$val'."; return 1; }
