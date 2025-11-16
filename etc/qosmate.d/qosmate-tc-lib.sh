@@ -271,6 +271,11 @@ try_setup_tc() {
     LAN=ifb-$WAN
     MTU=1500
 
+    command -v tc >/dev/null || {
+        error_out "'tc' command not found."
+        return 1
+    }
+
     ## Set up ctinfo downstream shaping
 
     print_msg "" "Setting up ctinfo downstream shaping..."
@@ -321,15 +326,10 @@ try_setup_tc() {
     elif [ "$ROOT_QDISC" = "hybrid" ] && [ "$gameqdisc" = "red" ]; then
         print_msg "Can not output tc -s qdisc because it crashes on OpenWrt when using RED qdisc in hybrid mode, but things are working!"
     else
-        # Check if tc command exists before trying to run it
-        if command -v tc >/dev/null; then
-            print_msg "--- Egress ($WAN) ---"
-            tc -s qdisc show dev "$WAN"
-            print_msg "--- Ingress ($LAN) ---"
-            tc -s qdisc show dev "$LAN"
-        else
-            print_msg "Warning: 'tc' command not found. Cannot display QoS status."
-        fi
+        print_msg "--- Egress ($WAN) ---"
+        tc -s qdisc show dev "$WAN"
+        print_msg "--- Ingress ($LAN) ---"
+        tc -s qdisc show dev "$LAN"
     fi
 }
 
