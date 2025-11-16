@@ -116,7 +116,7 @@ traverse_obj() {
 		condition_hier_ind="${condition_hier_ind:-0}" \
 		condition_json_path='' \
 		match_var match_err \
-		json_obj_cnt=0 json_child_type key val child_keys='' family families class_enums \
+		json_child_type key val child_keys='' family families class_enums \
 		req_key req_val req_vals \
 		pr_offset="$pr_offset" \
 		IFS="$DEFAULT_IFS" \
@@ -163,8 +163,6 @@ traverse_obj() {
 	esac
 
 	for key in $child_keys; do
-		json_obj_cnt=$((json_obj_cnt + 1))
-
 		json_get_type json_child_type "$key" || { json_err "Failed to get type of key '$key'."; return 1; }
 
 		[ "$json_child_type" = int ] && json_child_type=string # int is equivalent to string for our use case
