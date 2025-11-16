@@ -320,17 +320,20 @@ try_setup_tc() {
     print_msg "DONE!"
 
     # Conditional output of tc status
-    if [ "$ROOT_QDISC" = "hfsc" ] && [ "$gameqdisc" = "red" ]; then
-        print_msg "Can not output tc -s qdisc because it crashes on OpenWrt when using RED qdisc, but things are working!"
-        # Add check for hybrid mode with red gameqdisc
-    elif [ "$ROOT_QDISC" = "hybrid" ] && [ "$gameqdisc" = "red" ]; then
-        print_msg "Can not output tc -s qdisc because it crashes on OpenWrt when using RED qdisc in hybrid mode, but things are working!"
-    else
+    case "$ROOT_QDISC" in hfsc|hybrid)
+        [ "$gameqdisc" != "red" ] || {
+            print_msg "" \
+                "Can not output tc -s qdisc because it crashes on OpenWrt when using RED qdisc, but things are working!"
+            false
+        }
+    esac && {
         print_msg "--- Egress ($WAN) ---"
         tc -s qdisc show dev "$WAN"
         print_msg "--- Ingress ($LAN) ---"
         tc -s qdisc show dev "$LAN"
-    fi
+    }
+
+    :
 }
 
 :
