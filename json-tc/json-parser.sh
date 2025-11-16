@@ -319,7 +319,7 @@ TRANSLATE_TO_SHELL=
 if [ -z "$APPLY_SOURCED" ]; then
 
 	error_out() {
-		printf '%s\n' "$*" >&2
+		printf '%s\n' "Error: $*" >&2
 	}
 
 	trim_spaces() {
