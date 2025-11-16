@@ -112,6 +112,7 @@ get_match_var() {
 }
 
 traverse_obj() {
+	helper_missing() { json_err "No helper specified for object '$json_obj'."; }
 	match_failed () { json_err "Failed to parse 'requires' statement '$1'."; }
 
 	local tc_obj_id='' tc_obj_type tc_obj_type_lc \
@@ -179,7 +180,7 @@ traverse_obj() {
 			QDISC*|CLASS_*|FILTERS*)
 				REQUIRES_EXPECTED=''
 				[ -z "$HELPER_REQ" ] || {
-					json_err "No helper specified for object '$json_obj'."
+					helper_missing
 					return 1
 				} ;;
 			LOGIC_BRANCH*) ;;
@@ -274,6 +275,11 @@ traverse_obj() {
 			*) json_err "Unexpected object type '$json_child_type'." "$key"; return 1
 		esac || return 1
 	done
+
+	[ -n "$HELPER_REQ" ] && {
+		helper_missing
+		return 1
+	}
 
 	[ -n "$TRANSLATE_TO_SHELL" ] && {
 		eval "condition_json_path=\"\${condition_json_path_${condition_hier_ind}}\""
