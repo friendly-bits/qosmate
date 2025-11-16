@@ -250,7 +250,7 @@ create_filters() {
 
 setup_tc() {
     try_setup_tc || {
-        error_out "Failed to set up $ROOT_QDISC."
+        error_out "Failed to set up $ROOT_QDISC root qdisc."
         # *** Any additional error handling needed? ***
         exit 1
     }
