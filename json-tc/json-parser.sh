@@ -31,15 +31,6 @@ json_select_h() {
 	:
 }
 
-# TODO: remove this function
-trim_spaces() {
-	local tr_in tr_out
-	eval "tr_in=\"\${$1}\""
-	tr_out="${tr_in%"${tr_in##*[! 	]}"}"
-	tr_out="${tr_out#"${tr_out%%[! 	]*}"}"
-	eval "$1=\"\${tr_out}\""
-}
-
 # Check that expression is safe for RHS of eval
 check_shell_expr() {
 	local s="$1"
@@ -328,8 +319,17 @@ parse_json() {
 
 TRANSLATE_TO_NO_JSON=
 if [ -z "$APPLY_SOURCED" ]; then
+
 	error_out() {
 		printf '%s\n' "$*" >&2
+	}
+
+	trim_spaces() {
+		local tr_in tr_out
+		eval "tr_in=\"\${$1}\""
+		tr_out="${tr_in%"${tr_in##*[! 	]}"}"
+		tr_out="${tr_out#"${tr_out%%[! 	]*}"}"
+		eval "$1=\"\${tr_out}\""
 	}
 
 	TRANSLATE_TO_NO_JSON=1
