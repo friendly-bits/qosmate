@@ -112,6 +112,8 @@ get_match_var() {
 }
 
 traverse_obj() {
+	match_failed () { json_err "Failed to parse 'requires' statement '$1'."; }
+
 	local tc_obj_id='' tc_obj_type tc_obj_type_lc \
 		condition_hier_ind="${condition_hier_ind:-0}" \
 		condition_json_path='' \
@@ -199,6 +201,8 @@ traverse_obj() {
 						req_vals="${val#"$req_key"}"
 						req_vals="${req_vals#=}"
 
+						[ -n "$req_vals" ] || { match_failed "$val"; return 1; }
+
 						get_match_var match_var "$req_key" || return 1
 
 						if [ -n "$TRANSLATE_TO_SHELL" ]; then
@@ -210,8 +214,7 @@ traverse_obj() {
 							continue
 						fi
 
-						[ -n "$req_vals" ] &&
-						IFS="|" &&
+						IFS="|"
 						for req_val in $req_vals; do
 							IFS="$DEFAULT_IFS"
 							[ -n "$req_val" ] || { match_err=1; break; }
@@ -220,7 +223,7 @@ traverse_obj() {
 						done
 						IFS="$DEFAULT_IFS"
 
-						[ -n "$match_err" ] && { json_err "Failed to parse 'requires' statement '$val'."; return 1; }
+						[ -n "$match_err" ] && { match_failed "$val"; return 1; }
 						break ;;
 					helper)
 						tc_obj_type="${json_obj%%_*}"
