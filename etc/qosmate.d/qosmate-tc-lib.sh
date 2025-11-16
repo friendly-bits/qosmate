@@ -260,25 +260,31 @@ create_filters() {
 ##############################
 
 setup_tc() {
+    try_setup_tc || {
+        error_out "Failed to set up $ROOT_QDISC."
+        # *** Any additional error handling needed? ***
+        exit 1
+    }
+}
+
+try_setup_tc() {
     LAN=ifb-$WAN
     MTU=1500
-
 
     ## Set up ctinfo downstream shaping
 
     print_msg "" "Setting up ctinfo downstream shaping..."
 
     # Set up ingress handle for WAN interface
-    tc qdisc add dev "$WAN" handle ffff: ingress
+    tc qdisc add dev "$WAN" handle ffff: ingress &&
 
     # Create IFB interface
-    ip link add name "ifb-$WAN" type ifb
-    ip link set "ifb-$WAN" up
+    ip link add name "$LAN" type ifb &&
+    ip link set "$LAN" up &&
 
     # Redirect ingress traffic from WAN to IFB and restore DSCP from conntrack
-    tc filter add dev "$WAN" parent ffff: protocol all matchall action ctinfo dscp 63 128 mirred egress redirect dev "ifb-$WAN"
-    LAN=ifb-$WAN
-
+    tc filter add dev "$WAN" parent ffff: protocol all matchall action ctinfo dscp 63 128 mirred \
+        egress redirect dev "$LAN" || return 1
 
     print_msg "Applying $ROOT_QDISC queueing discipline."
 
@@ -294,7 +300,7 @@ setup_tc() {
         hybrid) setup_hybrid ;;
         cake) setup_cake ;;
         htb) setup_htb
-    esac || exit 1
+    esac || return 1
 
     ## Set up ctinfo for upstream (egress) - SFO compatibility
     # Restore DSCP values from conntrack for egress packets
