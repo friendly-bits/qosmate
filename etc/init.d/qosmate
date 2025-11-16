@@ -63,9 +63,13 @@ QOSMATE_FILES_REG_PATH_BACKEND=${QOSMATE_D}/backend_reg.md5
 QOSMATE_FILES_REG_PATH_FRONTEND=${QOSMATE_D}/frontend_reg.md5
 
 ### Backend files
-QOSMATE_SERVICE_PATH=/etc/init.d/qosmate
-QOSMATE_MAIN_SCRIPT=/etc/qosmate.sh
-QOSMATE_HOTPLUG_SCRIPT=/etc/hotplug.d/iface/13-qosmateHotplug
+QOSMATE_SERVICE_PATH="/etc/init.d/qosmate"
+QOSMATE_MAIN_SCRIPT="/etc/qosmate.sh"
+QOSMATE_HOTPLUG_SCRIPT="/etc/hotplug.d/iface/13-qosmateHotplug"
+export \
+    QOSMATE_TC_LIB="${QOSMATE_D}/qosmate-tc-lib.sh" \
+    QOSMATE_LIB_hfsc="${QOSMATE_D}/hfsc-qdisc-lib.sh" \
+    QOSMATE_LIB_hybrid="${QOSMATE_D}/hybrid-qdisc-lib.sh"
 
 # stores the version and update channel
 QOSMATE_VERSION_FILE_BACKEND=$QOSMATE_SERVICE_PATH
@@ -75,6 +79,9 @@ QOSMATE_GEN_FILES_BACKEND="
     $QOSMATE_SERVICE_PATH
     $QOSMATE_MAIN_SCRIPT
     $QOSMATE_DEFAULTS_FILE
+    $QOSMATE_TC_LIB
+    $QOSMATE_LIB_hfsc
+    $QOSMATE_LIB_hybrid
     /usr/lib/tc/experimental.dist
     /usr/lib/tc/normal.dist
     /usr/lib/tc/normmix20-64.dist
