@@ -102,25 +102,14 @@ print_no_json_line() {
 
 
 get_match_var() {
-	local match_var
+	local _var
 	case "$2" in
-		direction) match_var="DIR" ;;
-		gameqdisc) match_var="gameqdisc" ;;
+		direction) _var="DIR" ;;
+		gameqdisc) _var="gameqdisc" ;;
 		*) false
 	esac || { json_err "Unexpected 'requires' match '$2'"; return 1; }
-	eval "$1=\"$match_var\""
+	eval "$1=\"$_var\""
 }
-
-# req match helper
-test_req_match() {
-	local test_val var key="$1" val="$2"
-	[ -n "$key" ] && [ -n "$val" ] &&
-	get_match_var var "$key" &&
-	eval "test_val=\"\${$var}\"" || return 2
-
-	[ "$val" = "$test_val" ]
-}
-
 
 traverse_obj() {
 	local tc_obj_id='' \
@@ -210,10 +199,11 @@ traverse_obj() {
 						req_vals="${val#"$req_key"}"
 						req_vals="${req_vals#=}"
 
-						if [ -n "$TRANSLATE_TO_NO_JSON" ]; then
-							local var
-							get_match_var var "$req_key" || return 1
-							print_no_json_line -no_err "case \"\$$var\" in ${req_vals})"
+						local match_var match_err=''
+						get_match_var match_var "$req_key" || return 1
+
+						if [ -n "$TRANSLATE_TO_SHELL" ]; then
+							print_no_json_line -no_err "case \"\$$match_var\" in ${req_vals})"
 							prev_line_err_check_req=''
 							condition_hier_ind=$((condition_hier_ind+1))
 							eval "condition_json_path_${condition_hier_ind}=\"$JSON_PATH\""
@@ -221,13 +211,13 @@ traverse_obj() {
 							continue
 						fi
 
-						local match_err=''
 						[ -n "$req_vals" ] &&
 						local IFS="|" &&
 						for req_val in $req_vals; do
 							IFS="$DEFAULT_IFS"
-							test_req_match "$req_key" "$req_val" && continue 2
-							[ $? != 2 ] || { match_err=1; break; }
+							[ -n "$req_val" ] || { match_err=1; break; }
+							eval "[ \"\$req_val\" = \"\${$match_var}\" ]" && continue 2
+							continue
 						done || match_err=1
 						IFS="$DEFAULT_IFS"
 
@@ -235,7 +225,7 @@ traverse_obj() {
 						break ;;
 					helper)
 						local tc_obj_type="${json_obj%%_*}"
-						if [ -z "$TRANSLATE_TO_NO_JSON" ]; then
+						if [ -z "$TRANSLATE_TO_SHELL" ]; then
 							create_tc_obj "$val" "${tc_obj_type}" "$tc_obj_id" "$tc_parent_obj_id" || return 1
 						else
 							case "$tc_obj_type" in
@@ -257,7 +247,7 @@ traverse_obj() {
 				case "$key" in
 					FILTERS)
 						families="ipv4 ipv6"
-						if [ -z "$TRANSLATE_TO_NO_JSON" ]; then
+						if [ -z "$TRANSLATE_TO_SHELL" ]; then
 							for family in $families; do
 								create_filters "$class_enums" "$tc_obj_id" "$family" || return 1
 							done
@@ -270,7 +260,7 @@ traverse_obj() {
 					FILTERS_IPV4|FILTERS_IPV6)
 						family="ipv${key#"FILTERS_IPV"}"
 
-						if [ -z "$TRANSLATE_TO_NO_JSON" ]; then
+						if [ -z "$TRANSLATE_TO_SHELL" ]; then
 							create_filters "$class_enums" "$tc_obj_id" "$family" || return 1
 						else
 							print_no_json_line -no_err \
@@ -283,7 +273,7 @@ traverse_obj() {
 		esac || return 1
 	done
 
-	[ -n "$TRANSLATE_TO_NO_JSON" ] && {
+	[ -n "$TRANSLATE_TO_SHELL" ] && {
 		eval "condition_json_path=\"\${condition_json_path_${condition_hier_ind}}\""
 		if [ "$JSON_PATH" = "$condition_json_path" ]; then
 			dec_pr_offset
@@ -317,7 +307,7 @@ parse_json() {
 }
 
 
-TRANSLATE_TO_NO_JSON=
+TRANSLATE_TO_SHELL=
 if [ -z "$APPLY_SOURCED" ]; then
 
 	error_out() {
@@ -332,7 +322,7 @@ if [ -z "$APPLY_SOURCED" ]; then
 		eval "$1=\"\${tr_out}\""
 	}
 
-	TRANSLATE_TO_NO_JSON=1
+	TRANSLATE_TO_SHELL=1
 
 	init_json_parser "$1" &&
 	parse_json &&
