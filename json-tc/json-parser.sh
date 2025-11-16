@@ -112,15 +112,19 @@ get_match_var() {
 }
 
 traverse_obj() {
-	local tc_obj_id='' \
+	local tc_obj_id='' tc_obj_type tc_obj_type_lc \
 		condition_hier_ind="${condition_hier_ind:-0}" \
 		condition_json_path='' \
+		match_var match_err \
 		json_obj_cnt=0 json_child_type key val child_keys='' family families class_enums \
 		req_key req_val req_vals \
 		pr_offset="$pr_offset" \
+		IFS="$DEFAULT_IFS" \
 			json_obj="$1" \
 			tc_parent_obj_id="$2"
 	
+	local traverse_parent_id="$tc_parent_obj_id"
+
 	case "$json_obj" in
 		ROOT)
 			tc_parent_obj_id=root
@@ -129,8 +133,6 @@ traverse_obj() {
 			json_select_h "$json_obj" || return 1
 			get_child_keys child_keys
 	esac
-
-	local traverse_parent_id="$tc_parent_obj_id"
 
 	case "$json_obj" in
 		QDISC)
@@ -199,7 +201,6 @@ traverse_obj() {
 						req_vals="${val#"$req_key"}"
 						req_vals="${req_vals#=}"
 
-						local match_var match_err=''
 						get_match_var match_var "$req_key" || return 1
 
 						if [ -n "$TRANSLATE_TO_SHELL" ]; then
@@ -212,7 +213,7 @@ traverse_obj() {
 						fi
 
 						[ -n "$req_vals" ] &&
-						local IFS="|" &&
+						IFS="|" &&
 						for req_val in $req_vals; do
 							IFS="$DEFAULT_IFS"
 							[ -n "$req_val" ] || { match_err=1; break; }
@@ -224,7 +225,7 @@ traverse_obj() {
 						[ -n "$match_err" ] && { json_err "Failed to parse 'requires' statement '$val'."; return 1; }
 						break ;;
 					helper)
-						local tc_obj_type="${json_obj%%_*}"
+						tc_obj_type="${json_obj%%_*}"
 						if [ -z "$TRANSLATE_TO_SHELL" ]; then
 							create_tc_obj "$val" "${tc_obj_type}" "$tc_obj_id" "$tc_parent_obj_id" || return 1
 						else
