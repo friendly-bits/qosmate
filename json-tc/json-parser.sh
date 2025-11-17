@@ -8,6 +8,14 @@ IFS="$DEFAULT_IFS"
 
 PR_OFFSET_UNIT="    "
 
+trim_spaces() {
+	local tr_in tr_out
+	eval "tr_in=\"\${$1}\""
+	tr_out="${tr_in%"${tr_in##*[! 	]}"}"
+	tr_out="${tr_out#"${tr_out%%[! 	]*}"}"
+	eval "$1=\"\${tr_out}\""
+}
+
 json_err() {
 	printf '\n'
 	[ -z "$ERR_PATH_REPORTED" ] && error_out "At json path '${JSON_PATH}${2:+":"}${2}'"
@@ -202,7 +210,7 @@ traverse_obj() {
 								requires)
 									json_get_type grandchild_type "$gc_key" &&
 									[ "$grandchild_type" = string ] &&
-									get_json_var curr_child_condition "$gc_key" && 
+									get_json_var curr_child_condition "$gc_key" &&
 									[ -n "$curr_child_condition" ] || {
 										json_err "Failed to process key '$gc_key'"
 										return 1
@@ -348,14 +356,6 @@ if [ -z "$APPLY_SOURCED" ]; then
 
 	error_out() {
 		printf '%s\n' "Error: $*" >&2
-	}
-
-	trim_spaces() {
-		local tr_in tr_out
-		eval "tr_in=\"\${$1}\""
-		tr_out="${tr_in%"${tr_in##*[! 	]}"}"
-		tr_out="${tr_out#"${tr_out%%[! 	]*}"}"
-		eval "$1=\"\${tr_out}\""
 	}
 
 	TRANSLATE_TO_SHELL=1
