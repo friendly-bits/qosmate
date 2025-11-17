@@ -17,7 +17,7 @@ append_param() {
     val="${val#":"}"
 
     case "$key" in
-        hfsc|cake|fq_codel|red|drr|qfq|pfifo|bfifo|netem) val="$key" ;;
+        root|hfsc|cake|fq_codel|red|drr|qfq|pfifo|bfifo|netem) val="$key" ;;
         min|max|avpkt|probability|burst|weight|quantum|limit|memory_limit|interval|target| \
             rt|ls|ul|sc| \
             overhead|mpu) param="$key" ;;
@@ -86,7 +86,7 @@ append_curve_params() {
     append_param "${curve}:${params_str}"
 }
 
-# Set tc stab parameters for HFSC/HTB/Hybrid
+# Get tc stab parameters for HFSC/HTB/Hybrid
 get_tc_overhead_params() {
     local _params=''
     # Detect ATM-based presets
