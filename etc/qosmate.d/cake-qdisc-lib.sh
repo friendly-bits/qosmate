@@ -24,6 +24,7 @@ cake_root_qdisc_helper() {
             esac
 
             append_params \
+                "root" \
                 "bandwidth:$UPRATE" \
                 "extra:$PRIORITY_QUEUE_EGRESS" \
                 "dual-srchost:$HOST_ISOLATION" \
@@ -39,6 +40,7 @@ cake_root_qdisc_helper() {
         DOWN)
             DEV="$LAN"
             append_params \
+                "root" \
                 "bandwidth:$DOWNRATE" \
                 "extra:ingress" \
                 "autorate-ingress:$AUTORATE_INGRESS" \
