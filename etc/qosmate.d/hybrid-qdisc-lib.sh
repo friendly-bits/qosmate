@@ -40,15 +40,15 @@ hybrid_cake_qdisc_helper() {
             append_params \
                 "extra:besteffort" \
                 "extra:$EXTRA_PARAMETERS_EGRESS" \
-                "dual_srchost:$HOST_ISOLATION" \
+                "dual-srchost:$HOST_ISOLATION" \
                 "nat:$NAT_EGRESS" \
                 "wash:$WASHDSCPUP" ;;
         DOWN)
             append_params \
                 "extra:besteffort ingress" \
                 "extra:$EXTRA_PARAMETERS_INGRESS" \
-                "dual_dsthost:$HOST_ISOLATION" \
-                "nat:$NAT_INRESS" \
+                "dual-dsthost:$HOST_ISOLATION" \
+                "nat:$NAT_INGRESS" \
                 "wash:$WASHDSCPDOWN"
     esac
     append_params \
@@ -96,17 +96,17 @@ apply_rules_hybrid() {
 }
 
 setup_hybrid() {
-    local DIR directions="UP DOWN" \
+    local DIR \
         DEV NON_GAME_RATE GAMERATE GAME_BURST_RATE BURST_DUR
 
-    for DIR in $directions; do
+    for DIR in UP DOWN; do
         set_hfsc_vars "$DIR" &&
         apply_rules_hybrid || return 1
     done
     :
 }
 
-[ -f "$QOSMATE_LIB_hfsc" ] || { error_out "Can not find '$QOSMATE_LIB_hfsc'"; return 1; }
+[ -f "$QOSMATE_LIB_HFSC" ] || { error_out "Can not find '$QOSMATE_LIB_HFSC'"; exit 1; }
 
 # shellcheck source=hfsc-qdisc-lib.sh
-. "$QOSMATE_LIB_hfsc"
+. "$QOSMATE_LIB_HFSC"
