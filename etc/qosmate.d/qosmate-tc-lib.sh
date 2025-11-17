@@ -26,7 +26,7 @@ append_param() {
         extra) ;;
         link) ;;
         bandwidth) param="bandwidth" val="${val:+"${val}kbit"}" ;;
-        dual_srchost|dual_dsthost|nat|wash|ack-filter)
+        dual-srchost|dual-dsthost|nat|wash|ack-filter|autorate-ingress)
             # Special treatment for cake params
             local prefix='' \
                 selector="$val"
@@ -36,7 +36,7 @@ append_param() {
                     ack-filter) prefix='no-' ;;
                     *) return 0 ;;
                 esac
-            val="${prefix}${key//_/-}" ;;
+            val="${prefix}${key}" ;;
         *) error_out "Unexpected param '$key'"; return 1
     esac
     [ -n "$val" ] || return 0
@@ -184,7 +184,7 @@ create_tc_obj() {
             case "$helper_short" in
                 hfsc_root|hfsc_game|hfsc_non_game|\
                 hybrid_cake|\
-                cake|fq_codel|red)
+                cake_root|cake|fq_codel|red)
                     ${helper_short}_qdisc_helper ${helper_args} ;;
                 *) unexp_func=1; false
             esac &&
@@ -282,19 +282,18 @@ try_setup_tc() {
 
     print_msg "Applying $ROOT_QDISC queueing discipline."
 
-    local lib_file
-    eval "lib_file=\"\${QOSMATE_LIB_${ROOT_QDISC}}\""
+    local lib_file setup_cmd
+	case "$ROOT_QDISC" in
+        hfsc) lib_file="$QOSMATE_LIB_HFSC" setup_cmd=setup_hfsc ;;
+        hybrid) lib_file="$QOSMATE_LIB_HYBRID" setup_cmd=setup_hybrid ;;
+        cake) lib_file="$QOSMATE_LIB_CAKE" setup_cmd=setup_cake ;;
+        htb) lib_file="$QOSMATE_LIB_HTB" setup_cmd=setup_htb
+	esac
+
     [ -f "$lib_file" ] || { error_out "Can not find $lib_file"; return 1; }
-    # shellcheck source=hybrid-qdisc-lib.sh
+    # shellcheck source=/dev/null
     . "$lib_file"
-
-
-    case "$ROOT_QDISC" in
-        hfsc) setup_hfsc ;;
-        hybrid) setup_hybrid ;;
-        cake) setup_cake ;;
-        htb) setup_htb
-    esac || return 1
+	$setup_cmd || return 1
 
     ## Set up ctinfo for upstream (egress) - SFO compatibility
     # Restore DSCP values from conntrack for egress packets
