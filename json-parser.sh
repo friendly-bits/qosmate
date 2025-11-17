@@ -8,6 +8,14 @@ IFS="$DEFAULT_IFS"
 
 PR_OFFSET_UNIT="    "
 
+trim_spaces() {
+	local tr_in tr_out
+	eval "tr_in=\"\${$1}\""
+	tr_out="${tr_in%"${tr_in##*[! 	]}"}"
+	tr_out="${tr_out#"${tr_out%%[! 	]*}"}"
+	eval "$1=\"\${tr_out}\""
+}
+
 json_err() {
 	printf '\n'
 	[ -z "$ERR_PATH_REPORTED" ] && error_out "At json path '${JSON_PATH}${2:+":"}${2}'"
@@ -29,15 +37,6 @@ json_select_h() {
 			JSON_PATH="${JSON_PATH}:${1}"
 	esac || { json_err "Failed to select object '$1'."; return 1; }
 	:
-}
-
-# TODO: remove this function
-trim_spaces() {
-	local tr_in tr_out
-	eval "tr_in=\"\${$1}\""
-	tr_out="${tr_in%"${tr_in##*[! 	]}"}"
-	tr_out="${tr_out#"${tr_out%%[! 	]*}"}"
-	eval "$1=\"\${tr_out}\""
 }
 
 # Check that expression is safe for RHS of eval
@@ -100,7 +99,7 @@ get_child_keys() {
 	:
 }
 
-print_no_json_line() {
+print_transl_line() {
 	local no_err=
 	[ "$1" = "-no_err" ] && { no_err=1; shift; }
 	[ -n "$prev_line_err_check_req" ] && printf '%s\n' " &&"
@@ -111,46 +110,41 @@ print_no_json_line() {
 
 
 get_match_var() {
-	local match_var
+	local _var
 	case "$2" in
-		direction) match_var="DIR" ;;
-		gameqdisc) match_var="gameqdisc" ;;
+		direction) _var="DIR" ;;
+		gameqdisc) _var="gameqdisc" ;;
 		*) false
 	esac || { json_err "Unexpected 'requires' match '$2'"; return 1; }
-	eval "$1=\"$match_var\""
+	eval "$1=\"$_var\""
 }
-
-# req match helper
-test_req_match() {
-	local test_val var key="$1" val="$2"
-	[ -n "$key" ] && [ -n "$val" ] &&
-	get_match_var var "$key" &&
-	eval "test_val=\"\${$var}\"" || return 2
-
-	[ "$val" = "$test_val" ]
-}
-
 
 traverse_obj() {
-	local tc_obj_id='' \
-		condition_hier_ind="${condition_hier_ind:-0}" \
-		condition_json_path='' \
-		json_obj_cnt=0 json_child_type key val child_keys='' family families class_enums \
+	helper_missing() { json_err "No helper specified for object '$json_obj'."; }
+	match_failed () { json_err "Failed to parse 'requires' statement '$1'."; }
+
+	local tc_obj_id='' tc_obj_type tc_obj_type_lc \
+		grandchild_keys grandchild_type \
+		curr_child_condition \
+		prev_child_condition='' \
+		condition_matched='' \
+		match_var match_err \
+		json_child_type key val child_keys='' family families class_enums \
 		req_key req_val req_vals \
 		pr_offset="$pr_offset" \
+		IFS="$DEFAULT_IFS" \
 			json_obj="$1" \
 			tc_parent_obj_id="$2"
 	
+	local traverse_parent_id="$tc_parent_obj_id"
+
 	case "$json_obj" in
 		ROOT)
-			tc_parent_obj_id=root
 			get_child_keys child_keys || { json_err "No child keys found."; return 1; } ;;
 		*)
 			json_select_h "$json_obj" || return 1
 			get_child_keys child_keys
 	esac
-
-	local traverse_parent_id="$tc_parent_obj_id"
 
 	case "$json_obj" in
 		QDISC)
@@ -181,8 +175,6 @@ traverse_obj() {
 	esac
 
 	for key in $child_keys; do
-		json_obj_cnt=$((json_obj_cnt + 1))
-
 		json_get_type json_child_type "$key" || { json_err "Failed to get type of key '$key'."; return 1; }
 
 		[ "$json_child_type" = int ] && json_child_type=string # int is equivalent to string for our use case
@@ -197,7 +189,7 @@ traverse_obj() {
 			QDISC*|CLASS_*|FILTERS*)
 				REQUIRES_EXPECTED=''
 				[ -z "$HELPER_REQ" ] || {
-					json_err "No helper specified for object '$json_obj'."
+					helper_missing
 					return 1
 				} ;;
 			LOGIC_BRANCH*) ;;
@@ -207,44 +199,77 @@ traverse_obj() {
 		case "$json_child_type" in
 			object)
 				case "$key" in
-					QDISC*|CLASS_*|LOGIC_BRANCH*) traverse_obj "$key" "$traverse_parent_id" ;;
+					QDISC*|CLASS_*|LOGIC_BRANCH*)
+						# check obj condition
+						curr_child_condition='' req_key='' req_vals='' match_var=''
+						json_select_h "$key" || return 1
+						get_child_keys grandchild_keys
+						for gc_key in $grandchild_keys; do
+							case "$gc_key" in
+								comment) continue ;;
+								requires)
+									json_get_type grandchild_type "$gc_key" &&
+									[ "$grandchild_type" = string ] &&
+									get_json_var curr_child_condition "$gc_key" &&
+									[ -n "$curr_child_condition" ] || {
+										json_err "Failed to process key '$gc_key'"
+										return 1
+									}
+
+									req_key="${curr_child_condition%%=*}"
+									req_vals="${curr_child_condition#"$req_key"}"
+									req_vals="${req_vals#=}"
+
+									[ -n "$req_vals" ] || { match_failed "$curr_child_condition"; return 1; }
+									get_match_var match_var "$req_key" || return 1
+									break ;;
+								*) break
+							esac
+						done
+						json_select_h .. || return 1
+
+						if [ -z "$TRANSLATE_TO_SHELL" ]; then
+							if [ -n "$match_var" ]; then
+								condition_matched=
+								IFS="|"
+								for req_val in $req_vals; do
+									IFS="$DEFAULT_IFS"
+									[ -n "$req_val" ] || { match_err=1; break; }
+									eval "[ \"\$req_val\" = \"\${$match_var}\" ]" && { condition_matched=1; break; }
+								done
+								IFS="$DEFAULT_IFS"
+								[ -n "$match_err" ] && { match_failed "$val"; return 1; }
+								# ignore child obj if condition not matched
+								[ -n "$condition_matched" ] || continue
+							fi
+						else
+							if [ "$curr_child_condition" != "$prev_child_condition" ]; then
+								if [ -n "$prev_child_condition" ]; then
+									dec_pr_offset
+									prev_line_err_check_req=''
+									printf '\n'
+									print_transl_line "esac"
+								fi
+								if [ -n "$curr_child_condition" ]; then
+									print_transl_line -no_err "case \"\$$match_var\" in ${req_vals})"
+									prev_line_err_check_req=''
+									inc_pr_offset
+								fi
+							fi
+							prev_child_condition="$curr_child_condition"
+						fi
+
+						traverse_obj "$key" "$traverse_parent_id" ;;
 					*) json_err "Unexpected key '$key'"; false
 				esac || return 1
 				continue ;;
 			string)
 				get_json_var val "$key" || return 1
 				case "$key" in
-					requires)
-						req_key="${val%%=*}"
-						req_vals="${val#"$req_key"}"
-						req_vals="${req_vals#=}"
-
-						if [ -n "$TRANSLATE_TO_NO_JSON" ]; then
-							local var
-							get_match_var var "$req_key" || return 1
-							print_no_json_line -no_err "case \"\$$var\" in ${req_vals})"
-							prev_line_err_check_req=''
-							condition_hier_ind=$((condition_hier_ind+1))
-							eval "condition_json_path_${condition_hier_ind}=\"$JSON_PATH\""
-							inc_pr_offset
-							continue
-						fi
-
-						local match_err=''
-						[ -n "$req_vals" ] &&
-						local IFS="|" &&
-						for req_val in $req_vals; do
-							IFS="$DEFAULT_IFS"
-							test_req_match "$req_key" "$req_val" && continue 2
-							[ $? != 2 ] || { match_err=1; break; }
-						done || match_err=1
-						IFS="$DEFAULT_IFS"
-
-						[ -n "$match_err" ] && { json_err "Failed to parse 'requires' statement '$val'."; return 1; }
-						break ;;
+					requires) ;; # processed by the parent json obj
 					helper)
-						local tc_obj_type="${json_obj%%_*}"
-						if [ -z "$TRANSLATE_TO_NO_JSON" ]; then
+						tc_obj_type="${json_obj%%_*}"
+						if [ -z "$TRANSLATE_TO_SHELL" ]; then
 							create_tc_obj "$val" "${tc_obj_type}" "$tc_obj_id" "$tc_parent_obj_id" || return 1
 						else
 							case "$tc_obj_type" in
@@ -252,7 +277,7 @@ traverse_obj() {
 								QDISC) tc_obj_type_lc=qdisc ;;
 								*) json_err "Unexpected tc obj type '$tc_obj_type'."; return 1
 							esac
-							print_no_json_line "create_${tc_obj_type_lc} \"$val\" \"$tc_obj_id\" \"$tc_parent_obj_id\""
+							print_transl_line "create_${tc_obj_type_lc} \"$val\" \"$tc_obj_id\" \"$tc_parent_obj_id\""
 						fi
 						inc_pr_offset
 						continue ;;
@@ -266,23 +291,23 @@ traverse_obj() {
 				case "$key" in
 					FILTERS)
 						families="ipv4 ipv6"
-						if [ -z "$TRANSLATE_TO_NO_JSON" ]; then
+						if [ -z "$TRANSLATE_TO_SHELL" ]; then
 							for family in $families; do
 								create_filters "$class_enums" "$tc_obj_id" "$family" || return 1
 							done
 						else
-							print_no_json_line -no_err "for family in $families; do"
-							print_no_json_line -no_err \
+							print_transl_line -no_err "for family in $families; do"
+							print_transl_line -no_err \
 								"${PR_OFFSET_UNIT}create_filters \"$class_enums\" \"$tc_obj_id\" \"\$family\" || return 1"
-							print_no_json_line "done"
+							print_transl_line "done"
 						fi ;;
 					FILTERS_IPV4|FILTERS_IPV6)
 						family="ipv${key#"FILTERS_IPV"}"
 
-						if [ -z "$TRANSLATE_TO_NO_JSON" ]; then
+						if [ -z "$TRANSLATE_TO_SHELL" ]; then
 							create_filters "$class_enums" "$tc_obj_id" "$family" || return 1
 						else
-							print_no_json_line -no_err \
+							print_transl_line -no_err \
 								"create_filters \"$class_enums\" \"$tc_obj_id\" \"$family\" || return 1"
 						fi ;;
 					*) json_err "Unexpected array '$key'"; return 1
@@ -292,16 +317,16 @@ traverse_obj() {
 		esac || return 1
 	done
 
-	[ -n "$TRANSLATE_TO_NO_JSON" ] && {
-		eval "condition_json_path=\"\${condition_json_path_${condition_hier_ind}}\""
-		if [ "$JSON_PATH" = "$condition_json_path" ]; then
-			dec_pr_offset
-			dec_pr_offset
-			prev_line_err_check_req=
-			printf '\n'
-			print_no_json_line "esac"
-			unset "condition_json_path_${condition_hier_ind}"
-		fi
+	if [ -n "$TRANSLATE_TO_SHELL" ] && [ -n "$prev_child_condition" ]; then
+		dec_pr_offset
+		prev_line_err_check_req=''
+		printf '\n'
+		print_transl_line "esac"
+	fi
+
+	[ -n "$HELPER_REQ" ] && {
+		helper_missing
+		return 1
 	}
 
 	case "$json_obj" in
@@ -322,17 +347,18 @@ init_json_parser() {
 }
 
 parse_json() {
-	traverse_obj "ROOT"
+	traverse_obj "ROOT" "root"
 }
 
 
-TRANSLATE_TO_NO_JSON=
+TRANSLATE_TO_SHELL=
 if [ -z "$APPLY_SOURCED" ]; then
+
 	error_out() {
-		printf '%s\n' "$*" >&2
+		printf '%s\n' "Error: $*" >&2
 	}
 
-	TRANSLATE_TO_NO_JSON=1
+	TRANSLATE_TO_SHELL=1
 
 	init_json_parser "$1" &&
 	parse_json &&
