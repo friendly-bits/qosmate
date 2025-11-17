@@ -1,8 +1,7 @@
 #!/bin/sh
 # shellcheck disable=SC3043
 
-: "${DEV}" "${PARAMS}" "${nongameqdisc:-}" "${nongameqdiscoptions:-}"
-: "${netemdelayms:-}" "${netemjitterms:-}" "${netemdist:-}" "${pktlossp:-}"
+: "${DEV}"
 
 
 ## CLASS HELPERS
