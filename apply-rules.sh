@@ -549,7 +549,7 @@ setup_hfsc_hybrid() {
 }
 
 # Add a value to use the json implementation
-USE_JSON=
+USE_JSON=1
 
 hfsc_json_file="${script_dir}/hfsc-rules.json"
 hybrid_json_file="${script_dir}/hybrid-rules.json"
