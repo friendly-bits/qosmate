@@ -68,8 +68,7 @@ QOSMATE_MAIN_SCRIPT="/etc/qosmate.sh"
 QOSMATE_HOTPLUG_SCRIPT="/etc/hotplug.d/iface/13-qosmateHotplug"
 export \
     QOSMATE_LIB_TC="${QOSMATE_D}/qosmate-lib-tc.sh" \
-    QOSMATE_LIB_HFSC="${QOSMATE_D}/qosmate-lib-hfsc.sh" \
-    QOSMATE_LIB_HYBRID="${QOSMATE_D}/qosmate-lib-hybrid.sh" \
+    QOSMATE_LIB_HFSC_HYBRID="${QOSMATE_D}/qosmate-lib-hfsc-hybrid.sh" \
     QOSMATE_LIB_CAKE="${QOSMATE_D}/qosmate-lib-cake.sh"
 
 # stores the version and update channel
@@ -81,8 +80,7 @@ QOSMATE_GEN_FILES_BACKEND="
     $QOSMATE_MAIN_SCRIPT
     $QOSMATE_DEFAULTS_FILE
     $QOSMATE_LIB_TC
-    $QOSMATE_LIB_HFSC
-    $QOSMATE_LIB_HYBRID
+    $QOSMATE_LIB_HFSC_HYBRID
     $QOSMATE_LIB_CAKE
     /usr/lib/tc/experimental.dist
     /usr/lib/tc/normal.dist
