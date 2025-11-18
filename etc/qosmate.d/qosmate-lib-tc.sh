@@ -17,15 +17,15 @@ append_param() {
     val="${val#":"}"
 
     case "$key" in
-        root|hfsc|cake|fq_codel|red|drr|qfq|pfifo|bfifo|netem) val="$key" ;;
-        min|max|avpkt|probability|burst|weight|quantum|limit|memory_limit|interval|target| \
+        root|hfsc|cake|htb|fq_codel|red|drr|qfq|pfifo|bfifo|netem) val="$key" ;;
+        min|max|avpkt|probability|burst|cburst|weight|quantum|limit|memory_limit|interval|target| \
             rt|ls|ul|sc| \
-            overhead|mpu) param="$key" ;;
+            overhead|mpu|prio) param="$key" ;;
         jitter) val="${val:+"${val}ms"}" ;;
         rtt) val="${val:+"${val}ms"}" ;;
         extra) ;;
         link) ;;
-        bandwidth) param="bandwidth" val="${val:+"${val}kbit"}" ;;
+        bandwidth|rate|ceil) param="$key" val="${val:+"${val}kbit"}" ;;
         dual-srchost|dual-dsthost|nat|wash|ack-filter|autorate-ingress)
             # Special treatment for cake params
             local prefix='' \
@@ -102,7 +102,7 @@ append_tc_overhead_params() {
         *)
             params="stab overhead ${OVERHEAD:-40} linklayer ethernet" ;;
     esac
-	append_params "extra:$params"
+    append_params "extra:$params"
 }
 
 # Generate and append CAKE parameters based on common link settings
@@ -121,7 +121,7 @@ append_cake_link_params() {
         cake-ethernet) link="ethernet"; : "${oh:=38}" ; [ "$1" = "-hybrid" ] || oh="" ;;
         ethernet|*)    link="ethernet"; : "${oh:=40}" ;;
     esac
-	append_params "link:$link" "overhead:$oh"
+    append_params "link:$link" "overhead:$oh"
 }
 
 
@@ -156,21 +156,20 @@ create_tc_obj() {
     case "$tc_obj_type" in
         QDISC)
             case "$helper_short" in
-                hfsc_root|cake_root|\
-				hfsc_game|hfsc_non_game|\
-                hfsc_cake|hybrid_cake|\
-				hfsc_fq_codel|\
-                red)
+                hfsc_root|hfsc_game|hfsc_non_game|hfsc_cake|hfsc_fq_codel|\
+                red|\
+                hybrid_cake|\
+                htb_root|htb_fq_codel|\
+                cake_root)
                     ${helper_short}_qdisc_helper ${helper_args} ;;
                 *) unexp_func=1; false
             esac &&
             echo "tc qdisc add dev \"$DEV\"${tc_parent_id:+ parent }${tc_parent_id}${tc_obj_id:+ handle }${tc_obj_id} ${PARAMS}" ;;
         CLASS)
             case "$helper_short" in
-                hfsc_main_link|\
-				hfsc_lan|\
-				hfsc_tin|hybrid_tin|\
-                game_drr_qfq)
+                hfsc_main_link|hfsc_lan|hfsc_tin|game_drr_qfq|\
+                hybrid_tin|\
+                htb_main|htb_tin)
                     ${helper_short}_class_helper ${helper_args} ;;
                 *) unexp_func=1; false
             esac &&
@@ -178,7 +177,7 @@ create_tc_obj() {
         *) false
     esac ||
         {
-            [ -n "$unexp_func" ] && error_out "Unexpected helper '$helper_short'."
+            [ -n "$unexp_func" ] && error_out "Unexpected $tc_obj_type helper '$helper_short'."
             error_out "Failed to create tc object with type '$tc_obj_type', ID '$tc_obj_id'."
             return 1
         }
@@ -242,16 +241,16 @@ try_setup_tc() {
     LAN=ifb-$WAN
     MTU=1500
 
-	# Ensure rates/packetsize are non-zero to avoid errors in calculations
-	local var val
-	for var in UPRATE DOWNRATE GAMEUP GAMEDOWN PACKETSIZE; do
-		eval "val=\"\${$var}\""
-		case "$val" in
-			''|*[!0-9]*) false ;;
-			*) [ "$val" -gt 0 ]
-		esac || val=1
-		eval "$var=\"\$val\""
-	done
+    # Ensure rates/packetsize are non-zero to avoid errors in calculations
+    local var val
+    for var in UPRATE DOWNRATE GAMEUP GAMEDOWN PACKETSIZE; do
+        eval "val=\"\${$var}\""
+        case "$val" in
+            ''|*[!0-9]*) false ;;
+            *) [ "$val" -gt 0 ]
+        esac || val=1
+        eval "$var=\"\$val\""
+    done
 
     ## Set up ctinfo downstream shaping
 
@@ -271,17 +270,17 @@ try_setup_tc() {
     print_msg "Applying $ROOT_QDISC queueing discipline."
 
     local lib_file setup_cmd
-	case "$ROOT_QDISC" in
+    case "$ROOT_QDISC" in
         hfsc) lib_file="$QOSMATE_LIB_HFSC_HYBRID" setup_cmd=setup_hfsc ;;
         hybrid) lib_file="$QOSMATE_LIB_HFSC_HYBRID" setup_cmd=setup_hybrid ;;
         cake) lib_file="$QOSMATE_LIB_CAKE" setup_cmd=setup_cake ;;
         htb) lib_file="$QOSMATE_LIB_HTB" setup_cmd=setup_htb
-	esac
+    esac
 
     [ -f "$lib_file" ] || { error_out "Can not find $lib_file"; return 1; }
     # shellcheck source=/dev/null
     . "$lib_file"
-	$setup_cmd || return 1
+    $setup_cmd || return 1
 
     ## Set up ctinfo for upstream (egress) - SFO compatibility
     # Restore DSCP values from conntrack for egress packets
