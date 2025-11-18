@@ -9,9 +9,8 @@
 ## QDISC HELPERS
 
 cake_root_qdisc_helper() {
-    local link oh ack_filter_egress_val
+    local ack_filter_egress_val
 
-    get_cake_link_params link oh &&
     append_params "cake" &&
 
     case "$DIR" in
@@ -28,9 +27,9 @@ cake_root_qdisc_helper() {
                 "bandwidth:$UPRATE" \
                 "extra:$PRIORITY_QUEUE_EGRESS" \
                 "dual-srchost:$HOST_ISOLATION" \
-                "rtt:$RTT" \
-                "link:$link" \
-                "overhead:$oh" \
+                "rtt:$RTT" &&
+            append_cake_link_params &&
+            append_params \
                 "extra:$LINK_COMPENSATION" \
                 "extra:$EXTRA_PARAMETERS_EGRESS" \
                 "nat:$NAT_EGRESS" \
@@ -46,9 +45,9 @@ cake_root_qdisc_helper() {
                 "autorate-ingress:$AUTORATE_INGRESS" \
                 "extra:$PRIORITY_QUEUE_INGRESS" \
                 "dual-dsthost:$HOST_ISOLATION" \
-                "rtt:$RTT" \
-                "link:$link" \
-                "overhead:$oh" \
+                "rtt:$RTT" &&
+            append_cake_link_params &&
+            append_params \
                 "extra:$LINK_COMPENSATION" \
                 "extra:$EXTRA_PARAMETERS_INGRESS" \
                 "nat:$NAT_INGRESS" \

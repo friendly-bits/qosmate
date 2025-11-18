@@ -105,23 +105,23 @@ append_tc_overhead_params() {
 	append_params "extra:$params"
 }
 
-# Get CAKE parameters from common link settings
-# $3 = "-hybrid" to force manual overhead for consistency with HFSC
-get_cake_link_params() {
-    local _oh="$OVERHEAD" _link="$COMMON_LINK_PRESETS"
+# Generate and append CAKE parameters based on common link settings
+# $1 = "-hybrid" to force manual overhead for consistency with HFSC
+append_cake_link_params() {
+    local oh="$OVERHEAD" link="$COMMON_LINK_PRESETS"
 
     # Determine link keyword and default overhead
-    case "$_link" in
+    case "$link" in
         *atm*|*adsl*|*pppoa*|*pppoe*|*bridged*|*ipoa*|conservative)
-            [ "$3" = "-hybrid" ] && _link="atm"
-            : "${_oh:=44}"
+            [ "$1" = "-hybrid" ] && link="atm"
+            : "${oh:=44}"
             ;;
-        docsis)        : "${_oh:=25}" ;;
-        raw)           : "${_oh:=0}"  ;;
-        cake-ethernet) _link="ethernet"; : "${_oh:=38}" ; [ "$3" = "-hybrid" ] || _oh="" ;;
-        ethernet|*)    _link="ethernet"; : "${_oh:=40}" ;;
+        docsis)        : "${oh:=25}" ;;
+        raw)           : "${oh:=0}"  ;;
+        cake-ethernet) link="ethernet"; : "${oh:=38}" ; [ "$1" = "-hybrid" ] || oh="" ;;
+        ethernet|*)    link="ethernet"; : "${oh:=40}" ;;
     esac
-    eval "$1=\"\$_link\" $2=\"\$_oh\""
+	append_params "link:$link" "overhead:$oh"
 }
 
 # shellcheck disable=SC2120

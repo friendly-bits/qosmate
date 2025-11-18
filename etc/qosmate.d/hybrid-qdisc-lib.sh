@@ -32,8 +32,6 @@ hybrid_tin_class_helper() {
 }
 
 hybrid_cake_qdisc_helper() {
-    local link oh
-    get_cake_link_params link oh -hybrid
     append_params "cake" || return 1
     case "$DIR" in
         UP)
@@ -52,9 +50,9 @@ hybrid_cake_qdisc_helper() {
                 "wash:$WASHDSCPDOWN"
     esac
     append_params \
-        "rtt:$RTT" \
-        "link:$link" \
-        "overhead:$oh" \
+        "rtt:$RTT" &&
+	append_cake_link_params -hybrid &&
+    append_params \
         "mpu:$MPU" \
         "extra:$ETHER_VLAN_KEYWORD" \
         "extra:$LINK_COMPENSATION"
