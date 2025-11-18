@@ -283,8 +283,8 @@ try_setup_tc() {
 
     local lib_file setup_cmd
 	case "$ROOT_QDISC" in
-        hfsc) lib_file="$QOSMATE_LIB_HFSC" setup_cmd=setup_hfsc ;;
-        hybrid) lib_file="$QOSMATE_LIB_HYBRID" setup_cmd=setup_hybrid ;;
+        hfsc) lib_file="$QOSMATE_LIB_HFSC_HYBRID" setup_cmd=setup_hfsc ;;
+        hybrid) lib_file="$QOSMATE_LIB_HFSC_HYBRID" setup_cmd=setup_hybrid ;;
         cake) lib_file="$QOSMATE_LIB_CAKE" setup_cmd=setup_cake ;;
         htb) lib_file="$QOSMATE_LIB_HTB" setup_cmd=setup_htb
 	esac
