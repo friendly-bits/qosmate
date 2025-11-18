@@ -308,7 +308,7 @@ try_setup_tc() {
 
     # Conditional output of tc status
     case "$ROOT_QDISC" in hfsc|hybrid)
-        [ "$gameqdisc" != "red" ] || {
+        [ "$gameqdisc" = "red" ] && {
             print_msg "" \
                 "Can not output tc -s qdisc because it crashes on OpenWrt when using RED qdisc, but things are working!"
             false
