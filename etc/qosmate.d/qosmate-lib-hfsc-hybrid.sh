@@ -298,7 +298,7 @@ apply_rules_hybrid() {
 
             create_class "hybrid_tin normal" "1:13" "1:1" &&
                 create_qdisc "hybrid_cake" "13:" "1:13" &&
-                create_filters "CS0" "1:13" "ipv6" || return 1
+                create_filters "CS0" "1:13" "ipv6" &&
 
             create_class "hybrid_tin bulk" "1:15" "1:1" &&
                 create_qdisc "hfsc_fq_codel -mem-coeff 1" "15:" "1:15" &&
