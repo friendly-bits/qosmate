@@ -238,58 +238,6 @@ hybrid_cake_qdisc_helper() {
 }
 
 
-# Sets DEV NON_GAME_RATE GAMERATE GAME_BURST_RATE BURST_DUR
-set_hfsc_vars() {
-    local DIR="$1" \
-        max_burst_rate min_burst_dur
-
-    # Validate gameqdisc choice (used by HFSC and Hybrid)
-    case "$gameqdisc" in
-        drr|qfq|pfifo|bfifo|red|fq_codel|netem) ;; # Supported game qdiscs
-        *)
-            print_msg -warn "Unsupported gameqdisc '$gameqdisc' selected in config. Using pfifo fallback."
-            gameqdisc="pfifo" ;; # Revert to a simple default as fallback
-    esac
-
-    case "$DIR" in
-        UP)
-            DEV="$WAN"
-            GAMERATE="$GAMEUP"
-            NON_GAME_RATE="$UPRATE" ;;
-        DOWN)
-            DEV="$LAN"
-            GAMERATE="$GAMEDOWN"
-            NON_GAME_RATE="$DOWNRATE" ;;
-        *) error_out "Unexpected direction '$DIR'"; return 1
-    esac
-
-    # Ensure rates/packetsize are non-zero to avoid errors in calculations
-    [ "$NON_GAME_RATE" -gt 0 ] || NON_GAME_RATE=1
-    [ "$GAMERATE" -gt 0 ] || GAMERATE=1
-    [ "$PACKETSIZE" -gt 0 ] || PACKETSIZE=1
-
-    min_burst_dur=25
-    BURST_DUR=$((5*1500*8/NON_GAME_RATE))
-    [ "$BURST_DUR" -ge $min_burst_dur ] ||
-        BURST_DUR=$min_burst_dur
-
-    max_burst_rate=$((NON_GAME_RATE*97/100))
-    GAME_BURST_RATE=$((GAMERATE*10))
-    [ "$GAME_BURST_RATE" -le $max_burst_rate ] ||
-        GAME_BURST_RATE=$max_burst_rate
-
-    if [ "$gameqdisc" = "netem" ]; then
-        # Only apply NETEM if this direction is enabled
-        case "$NETEM_DIRECTION" in
-            both) : ;;
-            egress) [ "$DIR" = "UP" ] ;;
-            ingress) [ "$DIR" = "DOWN" ] ;;
-            *) false ;; # TODO: Error out
-        esac || gameqdisc=pfifo
-    fi
-
-}
-
 apply_rules_hfsc() {
     create_qdisc "hfsc_root" "1:" "root" &&
 
@@ -377,10 +325,56 @@ apply_rules_hybrid() {
 
 setup_hfsc_hybrid() {
     local DIR \
-        DEV NON_GAME_RATE GAMERATE GAME_BURST_RATE BURST_DUR
+        DEV \
+        NON_GAME_RATE GAMERATE GAME_BURST_RATE BURST_DUR \
+        max_burst_rate min_burst_dur
+
+    # Validate gameqdisc choice (used by HFSC and Hybrid)
+    case "$gameqdisc" in
+        drr|qfq|pfifo|bfifo|red|fq_codel|netem) ;; # Supported game qdiscs
+        *)
+            print_msg -warn "Unsupported gameqdisc '$gameqdisc' selected in config. Using pfifo fallback."
+            gameqdisc="pfifo" ;; # Revert to a simple default as fallback
+    esac
 
     for DIR in UP DOWN; do
-        set_hfsc_vars "$DIR" &&
+        case "$DIR" in
+            UP)
+                DEV="$WAN"
+                GAMERATE="$GAMEUP"
+                NON_GAME_RATE="$UPRATE" ;;
+            DOWN)
+                DEV="$LAN"
+                GAMERATE="$GAMEDOWN"
+                NON_GAME_RATE="$DOWNRATE" ;;
+            *) error_out "Unexpected direction '$DIR'"; return 1
+        esac
+
+        # Ensure rates/packetsize are non-zero to avoid errors in calculations
+        [ "$NON_GAME_RATE" -gt 0 ] || NON_GAME_RATE=1
+        [ "$GAMERATE" -gt 0 ] || GAMERATE=1
+        [ "$PACKETSIZE" -gt 0 ] || PACKETSIZE=1
+
+        min_burst_dur=25
+        BURST_DUR=$((5*1500*8/NON_GAME_RATE))
+        [ "$BURST_DUR" -ge $min_burst_dur ] ||
+            BURST_DUR=$min_burst_dur
+
+        max_burst_rate=$((NON_GAME_RATE*97/100))
+        GAME_BURST_RATE=$((GAMERATE*10))
+        [ "$GAME_BURST_RATE" -le $max_burst_rate ] ||
+            GAME_BURST_RATE=$max_burst_rate
+
+        if [ "$gameqdisc" = "netem" ]; then
+            # Only apply NETEM if this direction is enabled
+            case "$NETEM_DIRECTION" in
+                both) : ;;
+                egress) [ "$DIR" = "UP" ] ;;
+                ingress) [ "$DIR" = "DOWN" ] ;;
+                *) false ;; # TODO: Error out
+            esac || gameqdisc=pfifo
+        fi
+
         case "$1" in
             hfsc) apply_rules_hfsc ;;
             hybrid) apply_rules_hybrid ;;
