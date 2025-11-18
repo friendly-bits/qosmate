@@ -1,0 +1,29 @@
+
+{
+	"QDISC_1": {
+		"helper": "htb_root",
+
+		"CLASS_1_1": {
+			"helper": "htb_main",
+
+			"CLASS_1_11": {
+				"helper": "htb_tin realtime",
+				"QDISC_110": { "helper": "htb_fq_codel quantum:300" },
+				"FILTERS": [ "EF", "CS5", "CS6", "CS7" ]
+			},
+
+			"CLASS_1_13": {
+				"helper": "htb_tin default",
+				"QDISC_130": { "helper": "htb_fq_codel quantum:1500" },
+				"FILTERS_IPV6": [ "CS0" ]
+			},
+
+			"CLASS_1_15": {
+				"helper": "htb_tin bulk",
+				"QDISC_150": { "helper": "htb_fq_codel quantum:300 targ_coeff:2" },
+				"FILTERS": [ "CS1" ]
+			}
+
+		}
+	}
+}
