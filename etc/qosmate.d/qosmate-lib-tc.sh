@@ -124,31 +124,6 @@ append_cake_link_params() {
 	append_params "link:$link" "overhead:$oh"
 }
 
-# shellcheck disable=SC2120
-fq_codel_qdisc_helper() {
-    local mem_coeff=2
-
-    case "$1" in
-        '') ;;
-        '-mem-coeff')
-            case "$2" in
-                ''|*![0-9]*) false ;;
-                *) mem_coeff="$2"
-            esac ;;
-        *) false
-    esac || {
-        error_out "fq_codel_qdisc_helper: invalid args '$*'."
-        return 1
-    }
-
-    append_params \
-        "fq_codel" \
-        "memory_limit:$(( NON_GAME_RATE*mem_coeff*100/8 ))" \
-        "interval:$(( 100 + 2*1500*8/NON_GAME_RATE ))" \
-        "target:$(( 540*8/NON_GAME_RATE + 4 ))" \
-        "quantum:$(( MTU * 2 ))"
-}
-
 
 ## TC OBJECTS AND FILTERS
 
@@ -181,17 +156,20 @@ create_tc_obj() {
     case "$tc_obj_type" in
         QDISC)
             case "$helper_short" in
-                hfsc_root|hfsc_game|hfsc_non_game|\
-                hybrid_cake|\
-                cake_root|cake|fq_codel|red)
+                hfsc_root|cake_root|\
+				hfsc_game|hfsc_non_game|\
+                hfsc_cake|hybrid_cake|\
+				hfsc_fq_codel|\
+                red)
                     ${helper_short}_qdisc_helper ${helper_args} ;;
                 *) unexp_func=1; false
             esac &&
             echo "tc qdisc add dev \"$DEV\"${tc_parent_id:+ parent }${tc_parent_id}${tc_obj_id:+ handle }${tc_obj_id} ${PARAMS}" ;;
         CLASS)
             case "$helper_short" in
-                hfsc_lan|hfsc_main_link|hfsc_tin|\
-                hybrid_tin|\
+                hfsc_main_link|\
+				hfsc_lan|\
+				hfsc_tin|hybrid_tin|\
                 game_drr_qfq)
                     ${helper_short}_class_helper ${helper_args} ;;
                 *) unexp_func=1; false

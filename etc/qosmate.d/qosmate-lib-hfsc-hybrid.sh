@@ -103,14 +103,14 @@ game_drr_qfq_class_helper() {
 
 hfsc_root_qdisc_helper() {
     append_params "root" &&
-    append_tc_overhead_params oh_params &&
+    append_tc_overhead_params &&
     append_params "hfsc" "extra:default 13"
 }
 
 hfsc_non_game_qdisc_helper() {
     case "$nongameqdisc" in
         cake) hfsc_cake_qdisc_helper ;;
-        fq_codel) fq_codel_qdisc_helper ;;
+        fq_codel) hfsc_fq_codel_qdisc_helper ;;
     esac
 }
 
@@ -120,7 +120,7 @@ hfsc_game_qdisc_helper() {
         pfifo) append_params "pfifo" "limit:$((PFIFOMIN+MAXDEL*NON_GAME_RATE/8/PACKETSIZE))" ;;
         bfifo) append_params "bfifo" "limit:$((MAXDEL * GAMERATE / 8))" ;;
         red) red_qdisc_helper ;;
-        fq_codel) fq_codel_qdisc_helper ;;
+        fq_codel) hfsc_fq_codel_qdisc_helper ;;
         netem) netem_qdisc_helper ;;
         *) error_out "Unexpected game qdisc '$gameqdisc'."; return 1 ;;
     esac
@@ -130,6 +130,31 @@ hfsc_cake_qdisc_helper() {
     append_params \
         "cake" \
         "extra:$nongameqdiscoptions"
+}
+
+# shellcheck disable=SC2120
+hfsc_fq_codel_qdisc_helper() {
+    local mem_coeff=2
+
+    case "$1" in
+        '') ;;
+        '-mem-coeff')
+            case "$2" in
+                ''|*![0-9]*) false ;;
+                *) mem_coeff="$2"
+            esac ;;
+        *) false
+    esac || {
+        error_out "hfsc_fq_codel_qdisc_helper: invalid args '$*'."
+        return 1
+    }
+
+    append_params \
+        "fq_codel" \
+        "memory_limit:$(( NON_GAME_RATE*mem_coeff*100/8 ))" \
+        "interval:$(( 100 + 2*1500*8/NON_GAME_RATE ))" \
+        "target:$(( 540*8/NON_GAME_RATE + 4 ))" \
+        "quantum:$(( MTU * 2 ))"
 }
 
 netem_qdisc_helper() {
@@ -328,7 +353,7 @@ apply_rules_hybrid() {
                 create_filters "CS0" "1:13" "ipv6" || return 1
 
             create_class "hybrid_tin bulk" "1:15" "1:1" &&
-                create_qdisc "fq_codel -mem-coeff 1" "15:" "1:15" &&
+                create_qdisc "hfsc_fq_codel -mem-coeff 1" "15:" "1:15" &&
                 for family in ipv4 ipv6; do
                     create_filters "CS1" "1:15" "$family" || return 1
                 done &&
