@@ -135,7 +135,7 @@ traverse_obj() {
 		IFS="$DEFAULT_IFS" \
 			json_obj="$1" \
 			tc_parent_obj_id="$2"
-	
+
 	local traverse_parent_id="$tc_parent_obj_id"
 
 	case "$json_obj" in
@@ -193,7 +193,7 @@ traverse_obj() {
 					return 1
 				} ;;
 			LOGIC_BRANCH*) ;;
-			*) false			
+			*) false
 		esac || { json_err "'$key' is not expected here."; return 1; }
 
 		case "$json_child_type" in
