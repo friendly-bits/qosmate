@@ -87,23 +87,22 @@ append_curve_params() {
 }
 
 # Get tc stab parameters for HFSC/HTB/Hybrid
-get_tc_overhead_params() {
-    local _params=''
+append_tc_overhead_params() {
+    local params=''
     # Detect ATM-based presets
     case "$COMMON_LINK_PRESETS" in
         *atm*|*adsl*|*pppoa*|*pppoe*|*bridged*|*ipoa*|conservative)
-            _params="stab mtu 2047 tsize 512 mpu 68 overhead ${OVERHEAD:-44} linklayer atm" ;;
+            params="stab mtu 2047 tsize 512 mpu 68 overhead ${OVERHEAD:-44} linklayer atm" ;;
         docsis)
-            _params="stab overhead ${OVERHEAD:-25} linklayer ethernet" ;;
+            params="stab overhead ${OVERHEAD:-25} linklayer ethernet" ;;
         cake-ethernet)
-            _params="stab overhead ${OVERHEAD:-38} linklayer ethernet" ;;
+            params="stab overhead ${OVERHEAD:-38} linklayer ethernet" ;;
         raw)
-            _params="stab overhead ${OVERHEAD:-0} linklayer ethernet" ;;
+            params="stab overhead ${OVERHEAD:-0} linklayer ethernet" ;;
         *)
-            _params="stab overhead ${OVERHEAD:-40} linklayer ethernet" ;;
+            params="stab overhead ${OVERHEAD:-40} linklayer ethernet" ;;
     esac
-    eval "$1=\"\${_params}\""
-    :
+	append_params "extra:$params"
 }
 
 # Get CAKE parameters from common link settings
