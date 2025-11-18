@@ -234,13 +234,24 @@ setup_tc() {
 }
 
 try_setup_tc() {
-    LAN=ifb-$WAN
-    MTU=1500
-
     command -v tc >/dev/null || {
         error_out "'tc' command not found."
         return 1
     }
+
+    LAN=ifb-$WAN
+    MTU=1500
+
+	# Ensure rates/packetsize are non-zero to avoid errors in calculations
+	local var val
+	for var in UPRATE DOWNRATE GAMEUP GAMEDOWN PACKETSIZE; do
+		eval "val=\"\${$var}\""
+		case "$val" in
+			''|*[!0-9]*) false ;;
+			*) [ "$val" -gt 0 ]
+		esac || val=1
+		eval "$var=\"\$val\""
+	done
 
     ## Set up ctinfo downstream shaping
 

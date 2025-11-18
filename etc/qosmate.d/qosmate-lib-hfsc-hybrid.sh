@@ -350,11 +350,6 @@ setup_hfsc_hybrid() {
             *) error_out "Unexpected direction '$DIR'"; return 1
         esac
 
-        # Ensure rates/packetsize are non-zero to avoid errors in calculations
-        [ "$NON_GAME_RATE" -gt 0 ] || NON_GAME_RATE=1
-        [ "$GAMERATE" -gt 0 ] || GAMERATE=1
-        [ "$PACKETSIZE" -gt 0 ] || PACKETSIZE=1
-
         min_burst_dur=25
         BURST_DUR=$((5*1500*8/NON_GAME_RATE))
         [ "$BURST_DUR" -ge $min_burst_dur ] ||
