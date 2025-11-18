@@ -18,7 +18,7 @@
 
 			"CLASS_1_15": {
 				"helper": "hybrid_tin bulk",
-				"QDISC_15": { "helper": "fq_codel -mem-coeff 1" },
+				"QDISC_15": { "helper": "hfsc_fq_codel -mem-coeff 1" },
 				"FILTERS": [ "CS1" ]
 			},
 
