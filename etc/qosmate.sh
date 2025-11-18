@@ -1210,6 +1210,6 @@ EOF
 ####################
 
 # shellcheck source=/dev/null
-. "$QOSMATE_TC_LIB" &&
+. "$QOSMATE_LIB_TC" &&
 setup_tc
 exit $?
