@@ -72,9 +72,9 @@ game_drr_qfq_class_helper() {
 ## QDISC HELPERS
 
 hfsc_root_qdisc_helper() {
-    local oh_params
-    get_tc_overhead_params oh_params || return 1
-    PARAMS="root $oh_params hfsc default 13"
+	append_params "root" &&
+    append_tc_overhead_params oh_params &&
+	append_params "hfsc" "extra:default 13"
 }
 
 hfsc_non_game_qdisc_helper() {
