@@ -69,9 +69,7 @@ config_load 'qosmate' || { error_out "Failed to get UCI config."; exit 1; }
 
 # Root qdisc
 case "$ROOT_QDISC" in
-    hfsc|hybrid|cake) ;;
-    htb)
-        error_out "Support for $ROOT_QDISC not implemented!"; exit 1 ;;
+    hfsc|hybrid|cake|htb) ;;
     *)
         # Fallback for unsupported ROOT_QDISC
         print_msg -err "Unsupported ROOT_QDISC: '$ROOT_QDISC'. Check /etc/config/qosmate."
