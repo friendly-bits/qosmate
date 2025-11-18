@@ -102,9 +102,9 @@ game_drr_qfq_class_helper() {
 ## QDISC HELPERS
 
 hfsc_root_qdisc_helper() {
-	append_params "root" &&
+    append_params "root" &&
     append_tc_overhead_params oh_params &&
-	append_params "hfsc" "extra:default 13"
+    append_params "hfsc" "extra:default 13"
 }
 
 hfsc_non_game_qdisc_helper() {
@@ -205,7 +205,7 @@ hybrid_cake_qdisc_helper() {
     esac
     append_params \
         "rtt:$RTT" &&
-	append_cake_link_params -hybrid &&
+    append_cake_link_params -hybrid &&
     append_params \
         "mpu:$MPU" \
         "extra:$ETHER_VLAN_KEYWORD" \
@@ -356,19 +356,19 @@ setup_hfsc_hybrid() {
 
     for DIR in UP DOWN; do
         set_hfsc_vars "$DIR" &&
-		case "$1" in
-			hfsc) apply_rules_hfsc ;;
-			hybrid) apply_rules_hybrid ;;
-			*) error_out "setup_hfsc_hybrid: unexpected input '$1'"; false
-		esac || return 1
+        case "$1" in
+            hfsc) apply_rules_hfsc ;;
+            hybrid) apply_rules_hybrid ;;
+            *) error_out "setup_hfsc_hybrid: unexpected input '$1'"; false
+        esac || return 1
     done
     :
 }
 
 setup_hfsc() {
-	setup_hfsc_hybrid hfsc
+    setup_hfsc_hybrid hfsc
 }
 
 setup_hybrid() {
-	setup_hfsc_hybrid hybrid
+    setup_hfsc_hybrid hybrid
 }
