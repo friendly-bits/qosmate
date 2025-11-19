@@ -11,7 +11,7 @@ _NL_='
 DEFAULT_IFS=" 	${_NL_}"
 IFS="$DEFAULT_IFS"
 
-: "${VERSION}" "${global_enabled:=}" "$gameqdisc" "${nongameqdisc:=}" "${nongameqdiscoptions:=}" "${OVERHEAD:=}"
+: "${VERSION}" "${global_enabled:=}" "$gameqdisc"
 
 . /lib/functions.sh
 
