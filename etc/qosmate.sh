@@ -1,5 +1,5 @@
 #!/bin/sh
-# shellcheck disable=SC3043,SC1091,SC2155,SC3020,SC3010,SC2016,SC2317,SC3060,SC3057,SC3003
+# shellcheck disable=SC3043,SC1091,SC3060,SC3057,SC2018,SC2019
 
 VERSION="1.2.0" # will become obsolete in future releases as version string is now in the init script
 
