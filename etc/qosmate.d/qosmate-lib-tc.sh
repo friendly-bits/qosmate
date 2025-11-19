@@ -99,49 +99,6 @@ append_param_QDISC() {
     QDISC_PARAMS="${QDISC_PARAMS}${QDISC_PARAMS:+ }${param}${param:+ }${val}"
 }
 
-append_curve_params() {
-    local key val param params_str='' steady_rate='' burst_rate='' burst_dur='' \
-        curve curve_type rate dur \
-        curve_in="$1"
-
-    case "$curve_in" in
-        rt|realtime) curve="rt" ;;
-        ls|linkshare) curve="ls" ;;
-        ul|upperlimit) curve="ul" ;;
-        sc|servicecurve) curve="sc" ;;
-        *) error_out "Unexpected curve '$curve_in'."; return 1
-    esac
-    shift
-
-    for param in "$@"; do
-        case "$param" in
-            *:*) : ;;
-            *) false
-        esac &&
-        key="${param%%":"*}" &&
-        val="${param#*":"}" &&
-        [ -n "$key" ] && [ -n "$val" ] &&
-        case "$key" in
-            steady_rate|burst_rate) [ "$val" -gt 0 ] || val=1
-        esac &&
-        case "$key" in
-            burst_dur) burst_dur=" d ${val}ms" ;;
-            burst_rate) burst_rate="m1 ${val}kbit" ;;
-            steady_rate) steady_rate="m2 ${val}kbit" ;;
-            *) false
-        esac ||
-            { error_out "Failed to process curve param '$param'."; return 1; }
-    done
-
-    : "${burst_rate}" "${steady_rate}" "${burst_dur}"
-
-    for curve_type in burst steady; do
-        eval "rate=\"\${${curve_type}_rate}\" dur=\"\${${curve_type}_dur}\""
-        params_str="${params_str}${params_str:+ }${rate}${dur}"
-    done
-    append_params QDISC "${curve}:${params_str}"
-}
-
 # Get tc stab parameters for HFSC/HTB/Hybrid
 append_tc_overhead_params() {
     local params=''
