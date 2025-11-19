@@ -11,7 +11,7 @@
 cake_root_qdisc_helper() {
     local ack_filter_egress_val
 
-    append_params "cake" &&
+    append_params QDISC "qdisc:cake" &&
 
     case "$DIR" in
         UP)
@@ -22,34 +22,34 @@ cake_root_qdisc_helper() {
                 *) ack_filter_egress_val=$ACK_FILTER_EGRESS ;;
             esac
 
-            append_params \
-                "root" \
+            append_params QDISC \
+                "qdisc:root" \
                 "bandwidth:$UPRATE" \
                 "extra:$PRIORITY_QUEUE_EGRESS" \
                 "dual-srchost:$HOST_ISOLATION" \
-                "rtt:$RTT" &&
+                "opt:rtt:$RTT" &&
             append_cake_link_params &&
-            append_params \
-                "extra:$LINK_COMPENSATION" \
-                "extra:$EXTRA_PARAMETERS_EGRESS" \
+            append_params QDISC \
+                "opt:extra:$LINK_COMPENSATION" \
+                "opt:extra:$EXTRA_PARAMETERS_EGRESS" \
                 "nat:$NAT_EGRESS" \
                 "wash:$WASHDSCPUP" \
                 "ack-filter:$ack_filter_egress_val"
                 ;;
         DOWN)
             DEV="$LAN"
-            append_params \
-                "root" \
+            append_params QDISC \
+                "qdisc:root" \
                 "bandwidth:$DOWNRATE" \
                 "extra:ingress" \
                 "autorate-ingress:$AUTORATE_INGRESS" \
                 "extra:$PRIORITY_QUEUE_INGRESS" \
                 "dual-dsthost:$HOST_ISOLATION" \
-                "rtt:$RTT" &&
+                "opt:rtt:$RTT" &&
             append_cake_link_params &&
-            append_params \
-                "extra:$LINK_COMPENSATION" \
-                "extra:$EXTRA_PARAMETERS_INGRESS" \
+            append_params QDISC \
+                "opt:extra:$LINK_COMPENSATION" \
+                "opt:extra:$EXTRA_PARAMETERS_INGRESS" \
                 "nat:$NAT_INGRESS" \
                 "wash:$WASHDSCPDOWN"
     esac
@@ -63,4 +63,3 @@ setup_cake() {
     done
     :
 }
-

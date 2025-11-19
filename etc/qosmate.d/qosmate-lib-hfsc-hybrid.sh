@@ -1,20 +1,20 @@
 #!/bin/sh
 # shellcheck disable=SC3043
 
-: "${DEV}" "${PARAMS}" "${nongameqdisc:-}" "${nongameqdiscoptions:-}"
+: "${DEV}" "${nongameqdisc:-}" "${nongameqdiscoptions:-}"
 : "${netemdelayms:-}" "${netemjitterms:-}" "${netemdist:-}" "${pktlossp:-}"
 
 
 ## CLASS HELPERS
 
 hfsc_main_link_class_helper() {
-    append_params "hfsc" &&
+    append_params CLASS "qdisc:hfsc" &&
     append_curve_params "linkshare" "steady_rate:$NON_GAME_RATE" &&
     append_curve_params "upperlimit" "steady_rate:$NON_GAME_RATE"
 }
 
 hfsc_lan_class_helper() {
-    append_params "hfsc" &&
+    append_params CLASS "qdisc:hfsc" &&
     append_curve_params "linkshare" "burst_rate:50000" "burst_dur:$BURST_DUR" "steady_rate:10000"
 }
 
@@ -47,7 +47,7 @@ hfsc_tin_class_helper() {
         *) # TODO: throw error
     esac
 
-    append_params "hfsc" &&
+    append_params CLASS "qdisc:hfsc" &&
     append_curve_params "linkshare" \
         "steady_rate:$((base_steady_rate*steady_percent/100))" \
         "burst_rate:$((base_burst_rate*burst_percent/100))" \
@@ -77,7 +77,7 @@ hybrid_tin_class_helper() {
         *) # TODO: throw error
     esac
 
-    append_params "hfsc" &&
+    append_params CLASS "qdisc:hfsc" &&
     append_curve_params "linkshare" \
         "steady_rate:$((base_steady_rate*steady_percent/100))" \
         "burst_rate:$((base_burst_rate*burst_percent/100))" \
@@ -93,8 +93,8 @@ game_drr_qfq_class_helper() {
         *) # TODO: throw error
     esac
 
-    append_params \
-        "${gameqdisc}" \
+    append_params CLASS \
+        "qdisc:${gameqdisc}" \
         "${param}:${1}"
 }
 
@@ -102,23 +102,24 @@ game_drr_qfq_class_helper() {
 ## QDISC HELPERS
 
 hfsc_root_qdisc_helper() {
-    append_params "root" &&
+    append_params QDISC "qdisc:root" &&
     append_tc_overhead_params &&
-    append_params "hfsc" "extra:default 13"
+    append_params QDISC "qdisc:hfsc" "extra:default 13"
 }
 
 hfsc_non_game_qdisc_helper() {
     case "$nongameqdisc" in
         cake) hfsc_cake_qdisc_helper ;;
         fq_codel) hfsc_fq_codel_qdisc_helper ;;
+        *) error_out "Unexpected non-game qdisc '$nongameqdisc'."; return 1
     esac
 }
 
 hfsc_game_qdisc_helper() {
     case "$gameqdisc" in
-        drr|qfq) append_params "$gameqdisc" ;;
-        pfifo) append_params "pfifo" "limit:$((PFIFOMIN+MAXDEL*NON_GAME_RATE/8/PACKETSIZE))" ;;
-        bfifo) append_params "bfifo" "limit:$((MAXDEL * GAMERATE / 8))" ;;
+        drr|qfq) append_params QDISC "qdisc:$gameqdisc" ;;
+        pfifo) append_params QDISC "qdisc:pfifo" "limit:$((PFIFOMIN+MAXDEL*NON_GAME_RATE/8/PACKETSIZE))" ;;
+        bfifo) append_params QDISC "qdisc:bfifo" "limit:$((MAXDEL * GAMERATE / 8))" ;;
         red) red_qdisc_helper ;;
         fq_codel) hfsc_fq_codel_qdisc_helper ;;
         netem) netem_qdisc_helper ;;
@@ -127,9 +128,9 @@ hfsc_game_qdisc_helper() {
 }
 
 hfsc_cake_qdisc_helper() {
-    append_params \
-        "cake" \
-        "extra:$nongameqdiscoptions"
+    append_params QDISC \
+        "qdisc:cake" \
+        "opt:extra:$nongameqdiscoptions"
 }
 
 # shellcheck disable=SC2120
@@ -149,8 +150,8 @@ hfsc_fq_codel_qdisc_helper() {
         return 1
     }
 
-    append_params \
-        "fq_codel" \
+    append_params QDISC \
+        "qdisc:fq_codel" \
         "memory_limit:$(( NON_GAME_RATE*mem_coeff*100/8 ))" \
         "interval:$(( 100 + 2*1500*8/NON_GAME_RATE ))" \
         "target:$(( 540*8/NON_GAME_RATE + 4 ))" \
@@ -158,8 +159,7 @@ hfsc_fq_codel_qdisc_helper() {
 }
 
 netem_qdisc_helper() {
-    local delay_params='' \
-        delay="$netemdelayms" \
+    local delay="$netemdelayms" \
         jitter='' \
         dist='' \
         pkt_loss=''
@@ -175,8 +175,6 @@ netem_qdisc_helper() {
         dist="${netemdist}"
     fi
 
-    delay_params="${delay:+"delay ${delay}ms"}${jitter:+" ${jitter}ms"}${dist:+" distribution ${dist}"}"
-
     # Add packet loss if set
     pkt_loss=
     case "$pktlossp" in
@@ -184,10 +182,13 @@ netem_qdisc_helper() {
         *) pkt_loss="$pktlossp"
     esac
 
-    append_params \
-        "netem" \
+    append_params QDISC \
+        "qdisc:netem" \
         "limit:$(( 4 + 9*NON_GAME_RATE/8/500 ))" \
-        "extra:${delay_params}${pkt_loss:+ }${pkt_loss}"
+        "delay:$delay" \
+        "opt:jitter:$jitter" \
+        "opt:distribution:$dist" \
+        "opt:pkt_loss:$pkt_loss"
 }
 
 red_qdisc_helper() {
@@ -199,8 +200,8 @@ red_qdisc_helper() {
     local redburst=$(( (redmin + redmin + redmax) / (3 * 500) ))
     [ $redburst -ge 2 ] || redburst=2
 
-    append_params \
-        "red" \
+    append_params QDISC \
+        "qdisc:red" \
         "limit:150000" \
         "min:$redmin" \
         "max:$redmax" \
@@ -211,30 +212,30 @@ red_qdisc_helper() {
 }
 
 hybrid_cake_qdisc_helper() {
-    append_params "cake" || return 1
+    append_params QDISC "qdisc:cake" || return 1
     case "$DIR" in
         UP)
-            append_params \
+            append_params QDISC \
                 "extra:besteffort" \
-                "extra:$EXTRA_PARAMETERS_EGRESS" \
+                "opt:extra:$EXTRA_PARAMETERS_EGRESS" \
                 "dual-srchost:$HOST_ISOLATION" \
                 "nat:$NAT_EGRESS" \
                 "wash:$WASHDSCPUP" ;;
         DOWN)
-            append_params \
+            append_params QDISC \
                 "extra:besteffort ingress" \
-                "extra:$EXTRA_PARAMETERS_INGRESS" \
+                "opt:extra:$EXTRA_PARAMETERS_INGRESS" \
                 "dual-dsthost:$HOST_ISOLATION" \
                 "nat:$NAT_INGRESS" \
                 "wash:$WASHDSCPDOWN"
     esac
-    append_params \
-        "rtt:$RTT" &&
+    append_params QDISC \
+        "opt:rtt:$RTT" &&
     append_cake_link_params -hybrid &&
-    append_params \
-        "mpu:$MPU" \
-        "extra:$ETHER_VLAN_KEYWORD" \
-        "extra:$LINK_COMPENSATION"
+    append_params QDISC \
+        "opt:mpu:$MPU" \
+        "opt:extra:$ETHER_VLAN_KEYWORD" \
+        "opt:extra:$LINK_COMPENSATION"
 }
 
 
@@ -334,8 +335,19 @@ setup_hfsc_hybrid() {
         drr|qfq|pfifo|bfifo|red|fq_codel|netem) ;; # Supported game qdiscs
         *)
             print_msg -warn "Unsupported gameqdisc '$gameqdisc' selected in config. Using pfifo fallback."
-            gameqdisc="pfifo" ;; # Revert to a simple default as fallback
+            gameqdisc="qdisc:pfifo" ;; # Revert to a simple default as fallback
     esac
+
+    # Ensure supported non-game qdisc for hfsc
+    [ "$1" != hfsc ] ||
+        case "$nongameqdisc" in
+            cake|fq_codel) ;;
+            *)
+                error_out "Unsupported qdisc for non-game traffic: '$nongameqdisc'." \
+                    "Supported qdiscs are: cake, fq_codel."
+                return 1
+        esac
+
 
     for DIR in UP DOWN; do
         case "$DIR" in
@@ -360,7 +372,7 @@ setup_hfsc_hybrid() {
         [ "$GAME_BURST_RATE" -le $max_burst_rate ] ||
             GAME_BURST_RATE=$max_burst_rate
 
-        if [ "$gameqdisc" = "netem" ]; then
+        if [ "$gameqdisc" = "qdisc:netem" ]; then
             # Only apply NETEM if this direction is enabled
             case "$NETEM_DIRECTION" in
                 both) : ;;

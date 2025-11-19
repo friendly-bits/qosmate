@@ -1,7 +1,7 @@
 #!/bin/sh
 # shellcheck disable=SC3043
 
-: "${DEV}" "${PARAMS}" "${nongameqdisc:-}" "${nongameqdiscoptions:-}"
+: "${DEV}"
 
 ## Param helpers
 
@@ -59,8 +59,8 @@ htb_main_class_helper() {
     calculate_htb_burst ROOT_BURST "$HTB_RATE" 1000 &&   # 1ms burst
     calculate_htb_burst ROOT_CBURST "$HTB_RATE" 1000 &&  # 1ms cburst
 
-    append_params \
-        "htb" \
+    append_params CLASS \
+        "qdisc:htb" \
         "quantum:$HTB_QUANTUM" \
         "rate:$HTB_RATE" \
         "ceil:$HTB_RATE" \
@@ -99,8 +99,8 @@ htb_tin_class_helper() {
     calculate_htb_burst cburst "$rate" 5000 || return 1
     [ "$cburst" -ge 1500 ] || cburst=1500
 
-    append_params \
-        "htb" \
+    append_params CLASS \
+        "qdisc:htb" \
         "quantum:$HTB_QUANTUM" \
         "rate:$rate" \
         "ceil:$ceil" \
@@ -112,9 +112,9 @@ htb_tin_class_helper() {
 ## QDISC HELPERS
 
 htb_root_qdisc_helper() {
-    append_params "root" &&
+    append_params QDISC "qdisc:root" &&
     append_tc_overhead_params &&
-    append_params "htb" "extra:default 13"
+    append_params QDISC "qdisc:htb" "extra:default 13"
 }
 
 htb_fq_codel_qdisc_helper() {
@@ -136,8 +136,8 @@ htb_fq_codel_qdisc_helper() {
     [ -z "$inval_args" ] && [ -n "$quantum" ] ||
         { error_out "htb_fq_codel_qdisc_helper: invalid args '$*'"; return 1; }
 
-    append_params \
-        "fq_codel" \
+    append_params QDISC \
+        "qdisc:fq_codel" \
         "interval:$(( 100 + 2*1500*8/HTB_RATE ))" \
         "target:$(( 4 + targ_coeff*540*8/HTB_RATE ))" \
         "quantum:$quantum"

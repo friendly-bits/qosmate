@@ -1,31 +1,87 @@
 #!/bin/sh
 # shellcheck disable=SC3043,SC3060
 
+: "$MTU" "${gameqdisc:-}"
+
 ## COMMON PARAM HELPERS
 
+unexp_qdisc() { error_out "Unexpected qdisc '$2' for tc object '$1'"; }
+
+# NOTE:
+# Syntax to append params: 'append_params [CLASS|QDISC] "key:val" ["key2:val2" "key3:val3" ... ]'
+
+# All passed keys must be explicitly supported in append_param_[CLASS|QDISC],
+#    otherwise param helper will error out
+# To allow param with empty value, prepend 'opt:', eg 'opt:key:val'
+#    otherwise param helper will error out on empty value
+# To append arbitrary string, use 'extra:val', or 'opt:extra:val' when value may be empty
+
 append_params() {
-    local param
-    for param in "$@"; do
-        append_param "$param" || return 1
+    local param_str key val opt me="append_params" \
+        obj_type="$1"
+    shift
+
+    case "$obj_type" in CLASS|QDISC) ;; *)
+        error_out "$me: invalid tc object type '$obj_type'"; return 1
+    esac
+
+    for param_str in "$@"; do
+        opt=
+        case "$param_str" in "opt:"*)
+            opt=1
+            param_str="${param_str#"opt:"}" ;;
+        esac
+        key="${param_str%%:*}"
+        val="${param_str#"$key"}"
+        val="${val#":"}"
+
+        [ -n "$key" ] || { error_out "$me: empty key in param string '$param_str'"; return 1; }
+
+        # params must have value except when key starts with 'opt:'
+        if [ -z "$val" ]; then
+            [ -n "$opt" ] || { error_out "$me: param '$key' must have a value."; return 1; }
+            return 0
+        fi
+
+        append_param_${obj_type} "$key" "$val" || { error_out "$me: unexpected param '$key'"; return 1; }
     done
+    :
 }
 
-append_param() {
-    local param_str="$1"
-    local param='' key="${param_str%%:*}"
-    local val="${param_str#"$key"}"
-    val="${val#":"}"
+append_param_CLASS() {
+    local param='' \
+        key="$1" val="$2"
 
     case "$key" in
-        root|hfsc|cake|htb|fq_codel|red|drr|qfq|pfifo|bfifo|netem) val="$key" ;;
-        min|max|avpkt|probability|burst|cburst|weight|quantum|limit|memory_limit|interval|target| \
-            rt|ls|ul|sc| \
-            overhead|mpu|prio) param="$key" ;;
-        jitter) val="${val:+"${val}ms"}" ;;
-        rtt) val="${val:+"${val}ms"}" ;;
+        qdisc)
+            case "$val" in
+                hfsc|htb|drr|qfq) ;;
+                *) unexp_qdisc CLASS "$val"; return 1
+            esac ;;
+        burst|cburst|weight|quantum|prio) param="$key" ;;
         extra) ;;
-        link) ;;
-        bandwidth|rate|ceil) param="$key" val="${val:+"${val}kbit"}" ;;
+        rate|ceil) param="$key" val="${val:+"${val}kbit"}" ;;
+        *) return 1
+    esac
+
+    CLASS_PARAMS="${CLASS_PARAMS}${CLASS_PARAMS:+ }${param}${param:+ }${val}"
+}
+
+append_param_QDISC() {
+    local param=''  \
+        key="$1" val="$2"
+
+    case "$key" in
+        qdisc)
+            case "$val" in
+                root|hfsc|cake|htb|drr|qfq|pfifo|bfifo|red|netem|fq_codel) ;;
+                *) unexp_qdisc QDISC "$val"; return 1
+            esac ;;
+        rt|ls|ul|sc|burst|min|max|avpkt|\
+            overhead|limit|memory_limit|interval|target|quantum|probability|mpu|distribution) param="$key" ;;
+        bandwidth) param="$key" val="${val:+"${val}kbit"}" ;;
+        rtt|delay|jitter) val="${val:+"${val}ms"}" ;;
+        extra|pkt_loss|link) ;;
         dual-srchost|dual-dsthost|nat|wash|ack-filter|autorate-ingress)
             # Special treatment for cake params
             local prefix='' \
@@ -37,10 +93,10 @@ append_param() {
                     *) return 0 ;;
                 esac
             val="${prefix}${key}" ;;
-        *) error_out "Unexpected param '$key'"; return 1
+        *) return 1
     esac
-    [ -n "$val" ] || return 0
-    PARAMS="${PARAMS}${PARAMS:+ }${param}${param:+ }${val}"
+
+    QDISC_PARAMS="${QDISC_PARAMS}${QDISC_PARAMS:+ }${param}${param:+ }${val}"
 }
 
 append_curve_params() {
@@ -83,7 +139,7 @@ append_curve_params() {
         eval "rate=\"\${${curve_type}_rate}\" dur=\"\${${curve_type}_dur}\""
         params_str="${params_str}${params_str:+ }${rate}${dur}"
     done
-    append_param "${curve}:${params_str}"
+    append_params QDISC "${curve}:${params_str}"
 }
 
 # Get tc stab parameters for HFSC/HTB/Hybrid
@@ -102,7 +158,7 @@ append_tc_overhead_params() {
         *)
             params="stab overhead ${OVERHEAD:-40} linklayer ethernet" ;;
     esac
-    append_params "extra:$params"
+    append_params QDISC "extra:$params"
 }
 
 # Generate and append CAKE parameters based on common link settings
@@ -121,7 +177,7 @@ append_cake_link_params() {
         cake-ethernet) link="ethernet"; : "${oh:=38}" ; [ "$1" = "-hybrid" ] || oh="" ;;
         ethernet|*)    link="ethernet"; : "${oh:=40}" ;;
     esac
-    append_params "link:$link" "overhead:$oh"
+    append_params QDISC "link:$link" "overhead:$oh"
 }
 
 
@@ -134,7 +190,7 @@ create_tc_obj() {
     inval_obj() { error_out "create_tc_obj: Invalid object id '$tc_obj_id'"; }
     inval_parent() { error_out "create_tc_obj: Invalid parent id '$tc_parent_id' for object '$tc_obj_id'"; }
 
-    local helper_short helper_args unexp_func='' PARAMS='' \
+    local helper_short helper_args unexp_func='' QDISC_PARAMS='' CLASS_PARAMS='' \
         helper_str="$1" tc_obj_type="$2" tc_obj_id="$3" tc_parent_id="$4"
 
     case "$tc_obj_id" in
@@ -156,15 +212,14 @@ create_tc_obj() {
     case "$tc_obj_type" in
         QDISC)
             case "$helper_short" in
-                hfsc_root|hfsc_game|hfsc_non_game|hfsc_cake|hfsc_fq_codel|\
-                red|\
+                hfsc_root|hfsc_game|hfsc_non_game|hfsc_cake|hfsc_fq_codel|red|\
                 hybrid_cake|\
                 htb_root|htb_fq_codel|\
                 cake_root)
                     ${helper_short}_qdisc_helper ${helper_args} ;;
                 *) unexp_func=1; false
             esac &&
-            echo "tc qdisc add dev \"$DEV\"${tc_parent_id:+ parent }${tc_parent_id}${tc_obj_id:+ handle }${tc_obj_id} ${PARAMS}" ;;
+            echo "tc qdisc add dev \"$DEV\"${tc_parent_id:+ parent }${tc_parent_id}${tc_obj_id:+ handle }${tc_obj_id} ${QDISC_PARAMS}" ;;
         CLASS)
             case "$helper_short" in
                 hfsc_main_link|hfsc_lan|hfsc_tin|game_drr_qfq|\
@@ -173,7 +228,7 @@ create_tc_obj() {
                     ${helper_short}_class_helper ${helper_args} ;;
                 *) unexp_func=1; false
             esac &&
-            echo "tc class add dev \"$DEV\" parent ${tc_parent_id} classid ${tc_obj_id} ${PARAMS}" ;;
+            echo "tc class add dev \"$DEV\" parent ${tc_parent_id} classid ${tc_obj_id} ${CLASS_PARAMS}" ;;
         *) false
     esac ||
         {
