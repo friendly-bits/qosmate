@@ -43,7 +43,7 @@ append_params() {
             return 0
         fi
 
-        append_param_${obj_type} "$key" "$val" || { error_out "$me: unexpected param '$key'"; return 1; }
+        append_param_${obj_type} "$key" "$val" || { error_out "$me: unexpected $obj_type param '$key'"; return 1; }
     done
     :
 }
@@ -58,7 +58,7 @@ append_param_CLASS() {
                 hfsc|htb|drr|qfq) ;;
                 *) unexp_qdisc CLASS "$val"; return 1
             esac ;;
-        burst|cburst|weight|quantum|prio) param="$key" ;;
+        rt|ls|ul|sc|burst|cburst|weight|quantum|prio) param="$key" ;;
         extra) ;;
         rate|ceil) param="$key" val="${val:+"${val}kbit"}" ;;
         *) return 1
@@ -77,7 +77,7 @@ append_param_QDISC() {
                 root|hfsc|cake|htb|drr|qfq|pfifo|bfifo|red|netem|fq_codel) ;;
                 *) unexp_qdisc QDISC "$val"; return 1
             esac ;;
-        rt|ls|ul|sc|burst|min|max|avpkt|\
+        burst|min|max|avpkt|\
             overhead|limit|memory_limit|interval|target|quantum|probability|mpu|distribution) param="$key" ;;
         bandwidth) param="$key" val="${val:+"${val}kbit"}" ;;
         rtt|delay|jitter) val="${val:+"${val}ms"}" ;;
@@ -144,10 +144,12 @@ create_class() { create_tc_obj "$1" CLASS "$2" "$3"; }
 create_qdisc() { create_tc_obj "$1" QDISC "$2" "$3"; }
 
 create_tc_obj() {
+    unexp_helper() { error_out "Unexpected $tc_obj_type helper '$helper_short'."; }
+    params_confusion() { error_out "TC object is $tc_obj_type but $1 params are set: '$2'"; }
     inval_obj() { error_out "create_tc_obj: Invalid object id '$tc_obj_id'"; }
     inval_parent() { error_out "create_tc_obj: Invalid parent id '$tc_parent_id' for object '$tc_obj_id'"; }
 
-    local helper_short helper_args unexp_func='' QDISC_PARAMS='' CLASS_PARAMS='' \
+    local helper_short helper_args  QDISC_PARAMS='' CLASS_PARAMS='' \
         helper_str="$1" tc_obj_type="$2" tc_obj_id="$3" tc_parent_id="$4"
 
     case "$tc_obj_id" in
@@ -174,8 +176,11 @@ create_tc_obj() {
                 htb_root|htb_fq_codel|\
                 cake_root)
                     ${helper_short}_qdisc_helper ${helper_args} ;;
-                *) unexp_func=1; false
-            esac &&
+                *) unexp_helper; false
+            esac || return 1
+
+            [ -z "$CLASS_PARAMS" ] || { params_confusion CLASS "$CLASS_PARAMS"; return 1; }
+
             echo "tc qdisc add dev \"$DEV\"${tc_parent_id:+ parent }${tc_parent_id}${tc_obj_id:+ handle }${tc_obj_id} ${QDISC_PARAMS}" ;;
         CLASS)
             case "$helper_short" in
@@ -183,14 +188,17 @@ create_tc_obj() {
                 hybrid_tin|\
                 htb_main|htb_tin)
                     ${helper_short}_class_helper ${helper_args} ;;
-                *) unexp_func=1; false
-            esac &&
+                *) unexp_helper; false
+            esac || return 1
+
+            [ -z "$QDISC_PARAMS" ] || { params_confusion QDISC "$QDISC_PARAMS"; return 1; }
+
             echo "tc class add dev \"$DEV\" parent ${tc_parent_id} classid ${tc_obj_id} ${CLASS_PARAMS}" ;;
         *) false
     esac ||
         {
-            [ -n "$unexp_func" ] && error_out "Unexpected $tc_obj_type helper '$helper_short'."
-            error_out "Failed to create tc object with type '$tc_obj_type', ID '$tc_obj_id'."
+            error_out "Failed to create tc object with type '$tc_obj_type'." \
+                "dev:'$DEV', parent:'$tc_parent_id', obj: '$tc_obj_id', params: '$QDISC_PARAMS'"
             return 1
         }
 }
