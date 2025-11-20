@@ -4,14 +4,19 @@
 		"helper": "hfsc_root",
 
 		"CLASS_1_2": {
+			"comment": "Router traffic class (only on LAN/IFB)",
 			"requires": "direction=DOWN",
 			"helper": "hfsc_lan"
 		},
 
 		"CLASS_1_1": {
+			"comment_1": "Main link",
 			"helper": "hfsc_main_link",
 
+			"comment_2": "Attach non-game qdiscs",
+
 			"CLASS_1_12": {
+				"comment": "Fast",
 				"helper": "hfsc_tin fast",
 
 				"QDISC": { "helper": "hfsc_non_game" },
@@ -19,6 +24,7 @@
 			},
 
 			"CLASS_1_13": {
+				"comment": "Normal (Default)",
 				"helper": "hfsc_tin normal",
 
 				"QDISC": { "helper": "hfsc_non_game" },
@@ -26,6 +32,7 @@
 			},
 
 			"CLASS_1_14": {
+				"comment": "Low Prio",
 				"helper": "hfsc_tin lowprio",
 
 				"QDISC": { "helper": "hfsc_non_game" },
@@ -33,6 +40,7 @@
 			},
 
 			"CLASS_1_15": {
+				"comment": "Bulk",
 				"helper": "hfsc_tin bulk",
 
 				"QDISC": { "helper": "hfsc_non_game" },
@@ -40,6 +48,7 @@
 			},
 
 			"CLASS_1_11": {
+				"comment": "Game qdisc - Realtime",
 				"helper": "hfsc_tin realtime",
 
 				"FILTERS": [ "EF", "CS5", "CS6", "CS7" ],

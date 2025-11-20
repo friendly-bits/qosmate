@@ -4,23 +4,36 @@
 		"helper": "htb_root",
 
 		"CLASS_1_1": {
+			"comment": "Main rate limiting",
 			"helper": "htb_main",
 
 			"CLASS_1_11": {
+				"comment": "Priority class for realtime/gaming traffic",
 				"helper": "htb_tin realtime",
-				"QDISC_110": { "helper": "htb_fq_codel quantum:300" },
+				"QDISC_110": {
+					"comment": "Priority class gets fq_codel with aggressive settings",
+					"helper": "htb_fq_codel quantum:300"
+				},
 				"FILTERS": [ "EF", "CS5", "CS6", "CS7" ]
 			},
 
 			"CLASS_1_13": {
+				"comment": "Best Effort - default traffic",
 				"helper": "htb_tin default",
-				"QDISC_130": { "helper": "htb_fq_codel quantum:1500" },
+				"QDISC_130": {
+					"comment": "Best effort with standard settings",
+					"helper": "htb_fq_codel quantum:1500"
+				},
 				"FILTERS_IPV6": [ "CS0" ]
 			},
 
 			"CLASS_1_15": {
+				"comment": "Background/Bulk - low priority",
 				"helper": "htb_tin bulk",
-				"QDISC_150": { "helper": "htb_fq_codel quantum:300 targ_coeff:2" },
+				"QDISC_150": {
+					"comment": "Background with larger target",
+					"helper": "htb_fq_codel quantum:300 targ_coeff:2"
+				},
 				"FILTERS": [ "CS1" ]
 			}
 
