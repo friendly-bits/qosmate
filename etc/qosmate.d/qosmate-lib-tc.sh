@@ -3,6 +3,11 @@
 
 : "$MTU" "${gameqdisc:-}"
 
+# Print tc commands to console rather than running them - for testing/debugging
+tc() {
+    printf '%s\n' "tc $*" >&2
+}
+
 ## COMMON PARAM HELPERS
 
 unexp_qdisc() { error_out "Unexpected qdisc '$2' for tc object '$1'"; }
@@ -43,6 +48,7 @@ append_params() {
             return 0
         fi
 
+        # shellcheck disable=SC2086
         append_param_${obj_type} "$key" "$val" || { error_out "$me: unexpected $obj_type param '$key'"; return 1; }
     done
     :
@@ -168,6 +174,7 @@ create_tc_obj() {
     helper_short="${helper_str%% *}"
     helper_args="${helper_str#"$helper_short"}"
 
+    # shellcheck disable=SC2086
     case "$tc_obj_type" in
         QDISC)
             case "$helper_short" in
@@ -181,7 +188,8 @@ create_tc_obj() {
 
             [ -z "$CLASS_PARAMS" ] || { params_confusion CLASS "$CLASS_PARAMS"; return 1; }
 
-            echo "tc qdisc add dev \"$DEV\"${tc_parent_id:+ parent }${tc_parent_id}${tc_obj_id:+ handle }${tc_obj_id} ${QDISC_PARAMS}" ;;
+            tc qdisc add dev "$DEV" ${tc_parent_id:+ parent "${tc_parent_id}"} ${tc_obj_id:+ handle "${tc_obj_id}"} \
+                ${QDISC_PARAMS} ;;
         CLASS)
             case "$helper_short" in
                 hfsc_main_link|hfsc_lan|hfsc_tin|game_drr_qfq|\
@@ -193,7 +201,7 @@ create_tc_obj() {
 
             [ -z "$QDISC_PARAMS" ] || { params_confusion QDISC "$QDISC_PARAMS"; return 1; }
 
-            echo "tc class add dev \"$DEV\" parent ${tc_parent_id} classid ${tc_obj_id} ${CLASS_PARAMS}" ;;
+            tc class add dev "$DEV" parent "${tc_parent_id}" classid "${tc_obj_id}" ${CLASS_PARAMS} ;;
         *) false
     esac ||
         {
@@ -234,8 +242,11 @@ create_filters() {
         esac
 
         # shellcheck disable=SC2086
-#		tc filter add dev "$DEV" parent 1: protocol "$proto" prio "$prio" u32 match $match_str classid "$class_id"
-        echo "    tc filter add dev \"$DEV\" parent 1: protocol \"$proto\" prio \"$prio\" u32 match $match_str classid \"$class_id\""
+        tc filter add dev "$DEV" parent 1: protocol "$proto" prio "$prio" u32 match $match_str classid "$class_id" || {
+            error_out "Failed to create tc filter." \
+                "DEV:'$DEV', proto:'$proto', prio:'$prio', match:'$match_str', class:'$class_id'"
+            return 1
+        }
     done
 }
 
