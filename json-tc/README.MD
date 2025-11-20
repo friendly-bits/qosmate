@@ -2,7 +2,11 @@
 
 The included `json-parser.sh` script can parse JSON files complying with the supported format and translate them into shell code for automatic TC structure generation. Resulting shell code relies on certain functions in `qosmate.d/qosmate-tc-lib.sh`.
 
+The parser automatically extracts TC object ID's (`handle` for TC qdisc, `class id` for TC class) and assigns that ID as parent ID to any child objects when generating the shell code.
+
 For an example of such generated shell code, see `qosmate.d/hfsc-qdisc-lib.sh`, function `apply_rules_hfsc()`.
+
+This is intended as a development feature. JSON files and parser are not installed on user devices.
 
 ## **Supported format**
 
@@ -50,9 +54,9 @@ Supported JSON objects must be named either `QDISC[_handle]`, `CLASS_[classid]` 
 - `CLASS` JSON objects must always specify class id, e.g. `CLASS_1_12` represents class with class id `1:12`.
 - `LOGIC_BRANCH` objects are not directly represented as TC objects but rather allow to generate code which conditionally creates (or not) arbitrary segments of TC structure during the runtime. `LOGIC_BRANCH` objects may be specified with or without suffix, e.g. `LOGIC_BRANCH_5` is valid, as well as `LOGIC_BRANCH`. The optional suffix has no effect on processing.
 
-Optional `"COMMENT": "some_string"` key-value pairs may be used anywhere - these are ignored by the parser.
+Optional `"comment[suffix]": "some_string"` key-value pairs may be used anywhere. They are translated into shell code comments. Suffix is optional.
 
-The parser implements format validation and will error out when encountering invalid format. The parser employs the `jshn` utility shipped with OpenWrt and relies on it for general JSON parsing and validation. Note that `jshn` implements only limited JSON format validation and error checking, so make sure to provide a valid and sensible JSON file.
+The parser implements format validation and will error out when encountering invalid format. The parser employs the `jshn` utility shipped with OpenWrt and relies on it for general JSON parsing and validation.
 
 #### **Helpers**
 
