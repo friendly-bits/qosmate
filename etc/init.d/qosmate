@@ -195,6 +195,14 @@ print_msg() {
 # logs each argument separately and prints to a separate line
 # optional arguments: '-err', '-warn' to set logged error level
 log_msg() {
+    print2dest() {
+        case "$err_l" in
+            err|warn) msgs_dest=/dev/stderr ;;
+            *) msgs_dest=/dev/stdout
+        esac
+        printf '%s\n' "$1" > "$msgs_dest"
+    }
+
     local msgs_prefix='' _arg err_l=info msgs_dest
 
     local IFS="$DEFAULT_IFS"
@@ -203,13 +211,9 @@ log_msg() {
         case "${_arg}" in
             "-err") err_l=err msgs_prefix="Error: " ;;
             "-warn") err_l=warn msgs_prefix="Warning: " ;;
-            '') printf '\n' ;; # print out empty lines
+            '') print2dest "" ;; # print out empty lines
             *)
-                case "$err_l" in
-                    err|warn) msgs_dest="/dev/stderr" ;;
-                    *) msgs_dest="/dev/stdout"
-                esac
-                printf '%s\n' "${msgs_prefix}${_arg}" > "$msgs_dest"
+                print2dest "${msgs_prefix}${_arg}"
                 logger -t qosmate -p user."$err_l" "${msgs_prefix}${_arg}"
                 msgs_prefix=''
         esac
