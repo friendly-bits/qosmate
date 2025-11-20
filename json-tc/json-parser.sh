@@ -377,7 +377,7 @@ if [ -z "$APPLY_SOURCED" ]; then
 
 	init_json_parser "$1" &&
 	parse_json &&
-	printf '\n'
+	printf '%s\n%s\n' " ||" "return 1"
 	exit $?
 fi
 
