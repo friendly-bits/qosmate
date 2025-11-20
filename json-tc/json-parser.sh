@@ -83,29 +83,42 @@ get_json_arr() {
 
 get_child_keys() {
 	eval "$1="
-	local _key _keys _child_keys=
+	local _key _keys _child_keys='' real_keys_seen=''
 	json_get_keys _keys &&
 	[ -n "$_keys" ] &&
 	for _key in $_keys; do
 		case "$_key" in
-			comment*) ;;
-			*) _child_keys="${_child_keys}${_key} "
+			comment*) _child_keys="${_child_keys}${_key} " ;;
+			*)
+				_child_keys="${_child_keys}${_key} "
+				real_keys_seen=1
 		esac
 		:
 	done &&
 	trim_spaces _child_keys &&
-	[ -n "$_child_keys" ] || return 1
+	[ -n "$real_keys_seen" ] || return 1
 	eval "$1=\"\${_child_keys}\""
 	:
 }
 
 print_transl_line() {
-	local no_err=
-	[ "$1" = "-no_err" ] && { no_err=1; shift; }
+	local arg no_err='' nl='' pr_line=''
+	for arg in "$@"; do
+		case "$arg" in
+			-no_err) no_err=1; shift ;;
+			-nl) nl=1; shift ;;
+			*) pr_line="${pr_line}${pr_line:+ }${arg}"
+		esac
+	done
 	[ -n "$prev_line_err_check_req" ] && printf '%s\n' " &&"
-	printf '%s' "${pr_offset}${1}"
+	case "$prev_pr_line" in
+		''|"case"*) ;;
+		*) [ -n "$nl" ] && printf '\n'
+	esac
+	printf '%s' "${pr_offset}${pr_line}"
 	prev_line_err_check_req=1
 	[ -n "$no_err" ] && { prev_line_err_check_req=''; printf '\n'; }
+	prev_pr_line="$pr_line"
 }
 
 
@@ -180,6 +193,7 @@ traverse_obj() {
 		[ "$json_child_type" = int ] && json_child_type=string # int is equivalent to string for our use case
 
 		case "$key" in
+			comment*) ;;
 			requires)
 				[ -n "$REQUIRES_EXPECTED" ] &&
 					REQUIRES_EXPECTED='' ;;
@@ -206,7 +220,7 @@ traverse_obj() {
 						get_child_keys grandchild_keys
 						for gc_key in $grandchild_keys; do
 							case "$gc_key" in
-								comment) continue ;;
+								comment*) continue ;;
 								requires)
 									json_get_type grandchild_type "$gc_key" &&
 									[ "$grandchild_type" = string ] &&
@@ -266,6 +280,7 @@ traverse_obj() {
 			string)
 				get_json_var val "$key" || return 1
 				case "$key" in
+					comment*) print_transl_line -nl -no_err "# ${val}" ;;
 					requires) ;; # processed by the parent json obj
 					helper)
 						tc_obj_type="${json_obj%%_*}"
