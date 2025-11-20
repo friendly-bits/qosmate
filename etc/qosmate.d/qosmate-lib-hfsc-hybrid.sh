@@ -371,15 +371,23 @@ setup_hfsc_hybrid() {
     local DIR \
         DEV \
         NON_GAME_RATE GAMERATE GAME_BURST_RATE BURST_DUR \
-        max_burst_rate min_burst_dur
+        max_burst_rate min_burst_dur \
+        gqd_err
 
     # Validate gameqdisc choice (used by HFSC and Hybrid)
     case "$gameqdisc" in
-        drr|qfq|pfifo|bfifo|red|fq_codel|netem) ;; # Supported game qdiscs
+        drr|qfq|pfifo|bfifo|red|fq_codel) : ;; # Supported game qdiscs
+        netem)
+            case "$NETEM_DIRECTION" in
+                both|egress|ingress) : ;;
+                *) gqd_err="Unexpected netem direction '$NETEM_DIRECTION'"; false ;;
+            esac ;;
         *)
-            print_msg -warn "Unsupported gameqdisc '$gameqdisc' selected in config. Using pfifo fallback."
-            gameqdisc="qdisc:pfifo" ;; # Revert to a simple default as fallback
-    esac
+            gqd_err="Unsupported gameqdisc '$gameqdisc'"; false ;;
+    esac || {
+        print_msg -warn "$gqd_err selected in config. Reverting to pfifo game qdisc."
+        gameqdisc=pfifo
+    }
 
     # Ensure supported non-game qdisc for hfsc
     [ "$1" != hfsc ] ||
@@ -421,7 +429,6 @@ setup_hfsc_hybrid() {
                 both) : ;;
                 egress) [ "$DIR" = "UP" ] ;;
                 ingress) [ "$DIR" = "DOWN" ] ;;
-                *) false ;; # TODO: Error out
             esac || gameqdisc=pfifo
         fi
 
