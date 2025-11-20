@@ -54,6 +54,7 @@ calculate_htb_burst() {
 
 htb_main_class_helper() {
     local ROOT_BURST ROOT_CBURST
+
     # Root class gets modest burst since we typically configure 80-90% of physical rate
     # This allows brief bursts into the headroom without causing bufferbloat
     calculate_htb_burst ROOT_BURST "$HTB_RATE" 1000 &&   # 1ms burst
@@ -112,6 +113,7 @@ htb_tin_class_helper() {
 ## QDISC HELPERS
 
 htb_root_qdisc_helper() {
+    # HTB root qdisc defaults to best effort (class 13)
     append_params QDISC "qdisc:root" &&
     append_tc_overhead_params &&
     append_params QDISC "qdisc:htb" "extra:default 13"
@@ -147,9 +149,10 @@ htb_fq_codel_qdisc_helper() {
 apply_rules_htb() {
     create_qdisc "htb_root" "1:" "root" &&
 
+        # Main rate limiting
         create_class "htb_main" "1:1" "1:" &&
 
-            # Priority class (1:11) - for realtime/gaming traffic
+            # Priority class for realtime/gaming traffic
             create_class "htb_tin realtime" "1:11" "1:1" &&
                 # Priority class gets fq_codel with aggressive settings
                 create_qdisc "htb_fq_codel quantum:300" "110:" "1:11" &&
@@ -157,13 +160,13 @@ apply_rules_htb() {
                     create_filters "EF CS5 CS6 CS7" "1:11" "$family" || return 1
                 done &&
 
-            # Best Effort class (1:13) - default traffic
+            # Best Effort - default traffic
             create_class "htb_tin default" "1:13" "1:1" &&
                 # Best effort with standard settings
                 create_qdisc "htb_fq_codel quantum:1500" "130:" "1:13" &&
-                create_filters "CS0" "1:13" "ipv6" &&
+                create_filters "CS0" "1:13" "ipv6" || return 1
 
-            # Background/Bulk class (1:15) - low priority
+            # Background/Bulk - low priority
             create_class "htb_tin bulk" "1:15" "1:1" &&
                 # Background with larger target
                 create_qdisc "htb_fq_codel quantum:300 targ_coeff:2" "150:" "1:15" &&

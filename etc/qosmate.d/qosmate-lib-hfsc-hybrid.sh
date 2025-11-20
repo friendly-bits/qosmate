@@ -286,36 +286,45 @@ apply_rules_hfsc() {
     create_qdisc "hfsc_root" "1:" "root" &&
 
         case "$DIR" in DOWN)
+            # Router traffic class (only on LAN/IFB)
             create_class "hfsc_lan" "1:2" "1:"
         esac &&
 
+        # Main link
         create_class "hfsc_main_link" "1:1" "1:" &&
 
-            create_class "hfsc_tin fast" "1:12" "1:" &&
+            # Attach non-game qdiscs
+
+            # Fast
+            create_class "hfsc_tin fast" "1:12" "1:1" &&
                 create_qdisc "hfsc_non_game" "" "1:12" &&
                 for family in ipv4 ipv6; do
                     create_filters "CS4 AF41 AF42" "1:12" "$family" || return 1
                 done &&
 
-            create_class "hfsc_tin normal" "1:13" "1:" &&
+            # Normal (Default)
+            create_class "hfsc_tin normal" "1:13" "1:1" &&
                 create_qdisc "hfsc_non_game" "" "1:13" &&
                 for family in ipv4 ipv6; do
                     create_filters "CS0" "1:13" "$family" || return 1
                 done &&
 
-            create_class "hfsc_tin lowprio" "1:14" "1:" &&
+            # Low Prio
+            create_class "hfsc_tin lowprio" "1:14" "1:1" &&
                 create_qdisc "hfsc_non_game" "" "1:14" &&
                 for family in ipv4 ipv6; do
                     create_filters "CS2 AF11" "1:14" "$family" || return 1
                 done &&
 
-            create_class "hfsc_tin bulk" "1:15" "1:" &&
+            # Bulk
+            create_class "hfsc_tin bulk" "1:15" "1:1" &&
                 create_qdisc "hfsc_non_game" "" "1:15" &&
                 for family in ipv4 ipv6; do
                     create_filters "CS1" "1:15" "$family" || return 1
                 done &&
 
-            create_class "hfsc_tin realtime" "1:11" "1:" &&
+            # Game qdisc - Realtime
+            create_class "hfsc_tin realtime" "1:11" "1:1" &&
                 for family in ipv4 ipv6; do
                     create_filters "EF CS5 CS6 CS7" "1:11" "$family" || return 1
                 done &&
@@ -327,7 +336,7 @@ apply_rules_hfsc() {
                         create_class "game_drr_qfq 4000" "10:2" "10:" &&
                             create_qdisc "red" "12:" "10:2" &&
                         create_class "game_drr_qfq 1000" "10:3" "10:" &&
-                            create_qdisc "red" "13:" "10:3" ;;
+                            create_qdisc "red" "13:" "10:3"
                     esac
 }
 
@@ -335,21 +344,26 @@ apply_rules_hybrid() {
     create_qdisc "hfsc_root" "1:" "root" &&
 
         case "$DIR" in DOWN)
+            # Router traffic class (only on LAN/IFB)
             create_class "hfsc_lan" "1:2" "1:"
         esac &&
 
+        # Main link
         create_class "hfsc_main_link" "1:1" "1:" &&
 
+            # CAKE (most traffic - default)
             create_class "hybrid_tin normal" "1:13" "1:1" &&
                 create_qdisc "hybrid_cake" "13:" "1:13" &&
-                create_filters "CS0" "1:13" "ipv6" &&
+                create_filters "CS0" "1:13" "ipv6" || return 1
 
+            # Bulk traffic (HFSC LS + fq_codel)
             create_class "hybrid_tin bulk" "1:15" "1:1" &&
                 create_qdisc "hfsc_fq_codel -mem-coeff 1" "15:" "1:15" &&
                 for family in ipv4 ipv6; do
                     create_filters "CS1" "1:15" "$family" || return 1
                 done &&
 
+            # High priority realtime (HFSC RT + gameqdisc)
             create_class "hfsc_tin realtime" "1:11" "1:1" &&
                 for family in ipv4 ipv6; do
                     create_filters "EF CS5 CS6 CS7" "1:11" "$family" || return 1
