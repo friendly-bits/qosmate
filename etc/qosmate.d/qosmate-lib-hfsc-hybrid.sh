@@ -439,7 +439,7 @@ setup_hfsc_hybrid() {
         [ "$GAME_BURST_RATE" -le $max_burst_rate ] ||
             GAME_BURST_RATE=$max_burst_rate
 
-        if [ "$gameqdisc" = "qdisc:netem" ]; then
+        if [ "$gameqdisc" = "netem" ]; then
             # Only apply NETEM if this direction is enabled
             case "$NETEM_DIRECTION" in
                 both) : ;;
