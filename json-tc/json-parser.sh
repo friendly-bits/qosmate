@@ -147,9 +147,9 @@ traverse_obj() {
 		pr_offset="$pr_offset" \
 		IFS="$DEFAULT_IFS" \
 			json_obj="$1" \
-			tc_parent_obj_id="$2"
+			tc_parent_id="$2"
 
-	local traverse_parent_id="$tc_parent_obj_id"
+	local traverse_parent_id="$tc_parent_id"
 
 	case "$json_obj" in
 		ROOT)
@@ -283,16 +283,23 @@ traverse_obj() {
 					comment*) print_transl_line -nl -no_err "# ${val}" ;;
 					requires) ;; # processed by the parent json obj
 					helper)
+						case "$tc_parent_id" in
+							root) ;;
+							*![0-9:]*) false ;;
+							*[0-9]:*) ;;
+							*) false
+						esac || { json_err "Invalid tc parent id '$tc_parent_id' for tc object '$tc_obj_id'"; return 1; }
+
 						tc_obj_type="${json_obj%%_*}"
 						if [ -z "$TRANSLATE_TO_SHELL" ]; then
-							create_tc_obj "$val" "${tc_obj_type}" "$tc_obj_id" "$tc_parent_obj_id" || return 1
+							create_tc_obj "$val" "${tc_obj_type}" "$tc_obj_id" "$tc_parent_id" || return 1
 						else
 							case "$tc_obj_type" in
 								CLASS) tc_obj_type_lc=class ;;
 								QDISC) tc_obj_type_lc=qdisc ;;
 								*) json_err "Unexpected tc obj type '$tc_obj_type'."; return 1
 							esac
-							print_transl_line "create_${tc_obj_type_lc} \"$val\" \"$tc_obj_id\" \"$tc_parent_obj_id\""
+							print_transl_line "create_${tc_obj_type_lc} \"$val\" \"$tc_obj_id\" \"$tc_parent_id\""
 						fi
 						inc_pr_offset
 						continue ;;
