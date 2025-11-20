@@ -47,18 +47,18 @@ append_curve_params() {
         eval "rate=\"\${${curve_type}_rate}\" dur=\"\${${curve_type}_dur}\""
         params_str="${params_str}${params_str:+ }${rate}${dur}"
     done
-    append_params CLASS "${curve}:${params_str}"
+    append_params CLASS "${curve}:${params_str}" || return 1
 }
 
 hfsc_main_link_class_helper() {
     append_params CLASS "qdisc:hfsc" &&
     append_curve_params "linkshare" "steady_rate:$NON_GAME_RATE" &&
-    append_curve_params "upperlimit" "steady_rate:$NON_GAME_RATE"
+    append_curve_params "upperlimit" "steady_rate:$NON_GAME_RATE" || return 1
 }
 
 hfsc_lan_class_helper() {
     append_params CLASS "qdisc:hfsc" &&
-    append_curve_params "linkshare" "burst_rate:50000" "burst_dur:$BURST_DUR" "steady_rate:10000"
+    append_curve_params "linkshare" "burst_rate:50000" "burst_dur:$BURST_DUR" "steady_rate:10000" || return 1
 }
 
 hfsc_tin_class_helper() {
@@ -94,7 +94,7 @@ hfsc_tin_class_helper() {
     append_curve_params "linkshare" \
         "steady_rate:$((base_steady_rate*steady_percent/100))" \
         "burst_rate:$((base_burst_rate*burst_percent/100))" \
-        "burst_dur:$BURST_DUR"
+        "burst_dur:$BURST_DUR" || return 1
 }
 
 hybrid_tin_class_helper() {
@@ -124,7 +124,7 @@ hybrid_tin_class_helper() {
     append_curve_params "linkshare" \
         "steady_rate:$((base_steady_rate*steady_percent/100))" \
         "burst_rate:$((base_burst_rate*burst_percent/100))" \
-        "burst_dur:$BURST_DUR"
+        "burst_dur:$BURST_DUR" || return 1
 }
 
 game_drr_qfq_class_helper() {
@@ -138,7 +138,7 @@ game_drr_qfq_class_helper() {
 
     append_params CLASS \
         "qdisc:${gameqdisc}" \
-        "${param}:${1}"
+        "${param}:${1}" || return 1
 }
 
 
@@ -147,15 +147,15 @@ game_drr_qfq_class_helper() {
 hfsc_root_qdisc_helper() {
     append_params QDISC "qdisc:root" &&
     append_tc_overhead_params &&
-    append_params QDISC "qdisc:hfsc" "extra:default 13"
+    append_params QDISC "qdisc:hfsc" "extra:default 13" || return 1
 }
 
 hfsc_non_game_qdisc_helper() {
     case "$nongameqdisc" in
         cake) hfsc_cake_qdisc_helper ;;
         fq_codel) hfsc_fq_codel_qdisc_helper ;;
-        *) error_out "Unexpected non-game qdisc '$nongameqdisc'."; return 1
-    esac
+        *) error_out "Unexpected non-game qdisc '$nongameqdisc'."; false
+    esac || return 1
 }
 
 hfsc_game_qdisc_helper() {
@@ -166,14 +166,14 @@ hfsc_game_qdisc_helper() {
         red) red_qdisc_helper ;;
         fq_codel) hfsc_fq_codel_qdisc_helper ;;
         netem) netem_qdisc_helper ;;
-        *) error_out "Unexpected game qdisc '$gameqdisc'."; return 1 ;;
-    esac
+        *) error_out "Unexpected game qdisc '$gameqdisc'."; false ;;
+    esac || return 1
 }
 
 hfsc_cake_qdisc_helper() {
     append_params QDISC \
         "qdisc:cake" \
-        "opt:extra:$nongameqdiscoptions"
+        "opt:extra:$nongameqdiscoptions" || return 1
 }
 
 # shellcheck disable=SC2120
@@ -198,7 +198,7 @@ hfsc_fq_codel_qdisc_helper() {
         "memory_limit:$(( NON_GAME_RATE*mem_coeff*100/8 ))" \
         "interval:$(( 100 + 2*1500*8/NON_GAME_RATE ))" \
         "target:$(( 540*8/NON_GAME_RATE + 4 ))" \
-        "quantum:$(( MTU * 2 ))"
+        "quantum:$(( MTU * 2 ))" || return 1
 }
 
 netem_qdisc_helper() {
@@ -231,7 +231,7 @@ netem_qdisc_helper() {
         "delay:$delay" \
         "opt:jitter:$jitter" \
         "opt:distribution:$dist" \
-        "opt:pkt_loss:$pkt_loss"
+        "opt:pkt_loss:$pkt_loss" || return 1
 }
 
 red_qdisc_helper() {
@@ -251,7 +251,7 @@ red_qdisc_helper() {
         "avpkt:500" \
         "bandwidth:$NON_GAME_RATE" \
         "burst:$redburst" \
-        "probability:1.0"
+        "probability:1.0" || return 1
 }
 
 hybrid_cake_qdisc_helper() {
@@ -271,14 +271,14 @@ hybrid_cake_qdisc_helper() {
                 "dual-dsthost:$HOST_ISOLATION" \
                 "nat:$NAT_INGRESS" \
                 "wash:$WASHDSCPDOWN"
-    esac
+    esac &&
     append_params QDISC \
         "opt:rtt:$RTT" &&
     append_cake_link_params -hybrid &&
     append_params QDISC \
         "opt:mpu:$MPU" \
         "opt:extra:$ETHER_VLAN_KEYWORD" \
-        "opt:extra:$LINK_COMPENSATION"
+        "opt:extra:$LINK_COMPENSATION" || return 1
 }
 
 
@@ -456,9 +456,9 @@ setup_hfsc_hybrid() {
 }
 
 setup_hfsc() {
-    setup_hfsc_hybrid hfsc
+    setup_hfsc_hybrid hfsc || return 1
 }
 
 setup_hybrid() {
-    setup_hfsc_hybrid hybrid
+    setup_hfsc_hybrid hybrid || return 1
 }

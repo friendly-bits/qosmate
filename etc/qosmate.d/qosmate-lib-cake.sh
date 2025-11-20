@@ -52,7 +52,7 @@ cake_root_qdisc_helper() {
                 "opt:extra:$EXTRA_PARAMETERS_INGRESS" \
                 "nat:$NAT_INGRESS" \
                 "wash:$WASHDSCPDOWN"
-    esac
+    esac || return 1
 }
 
 setup_cake() {

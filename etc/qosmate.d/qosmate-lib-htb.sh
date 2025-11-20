@@ -66,7 +66,7 @@ htb_main_class_helper() {
         "rate:$HTB_RATE" \
         "ceil:$HTB_RATE" \
         "burst:$ROOT_BURST" \
-        "cburst:$ROOT_CBURST"
+        "cburst:$ROOT_CBURST" || return 1
 }
 
 htb_tin_class_helper() {
@@ -107,7 +107,7 @@ htb_tin_class_helper() {
         "ceil:$ceil" \
         "burst:$burst" \
         "cburst:$cburst" \
-        "prio:$prio"
+        "prio:$prio" || return 1
 }
 
 ## QDISC HELPERS
@@ -116,7 +116,7 @@ htb_root_qdisc_helper() {
     # HTB root qdisc defaults to best effort (class 13)
     append_params QDISC "qdisc:root" &&
     append_tc_overhead_params &&
-    append_params QDISC "qdisc:htb" "extra:default 13"
+    append_params QDISC "qdisc:htb" "extra:default 13" || return 1
 }
 
 htb_fq_codel_qdisc_helper() {
@@ -142,7 +142,7 @@ htb_fq_codel_qdisc_helper() {
         "qdisc:fq_codel" \
         "interval:$(( 100 + 2*1500*8/HTB_RATE ))" \
         "target:$(( 4 + targ_coeff*540*8/HTB_RATE ))" \
-        "quantum:$quantum"
+        "quantum:$quantum" || return 1
 }
 
 

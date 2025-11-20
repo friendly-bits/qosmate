@@ -115,7 +115,7 @@ append_tc_overhead_params() {
         *)
             params="stab overhead ${OVERHEAD:-40} linklayer ethernet" ;;
     esac
-    append_params QDISC "extra:$params"
+    append_params QDISC "extra:$params" || return 1
 }
 
 # Generate and append CAKE parameters based on common link settings
@@ -134,7 +134,7 @@ append_cake_link_params() {
         cake-ethernet) link="ethernet"; : "${oh:=38}" ; [ "$1" = "-hybrid" ] || oh="" ;;
         ethernet|*)    link="ethernet"; : "${oh:=40}" ;;
     esac
-    append_params QDISC "link:$link" "overhead:$oh"
+    append_params QDISC "link:$link" "overhead:$oh" || return 1
 }
 
 
