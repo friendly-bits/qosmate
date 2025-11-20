@@ -337,7 +337,8 @@ apply_rules_hfsc() {
                             create_qdisc "red" "12:" "10:2" &&
                         create_class "game_drr_qfq 1000" "10:3" "10:" &&
                             create_qdisc "red" "13:" "10:3"
-                    esac
+                    esac ||
+    return 1
 }
 
 apply_rules_hybrid() {
@@ -377,7 +378,8 @@ apply_rules_hybrid() {
                             create_qdisc "red" "12:" "10:2" &&
                         create_class "game_drr_qfq 1000" "10:3" "10:" &&
                             create_qdisc "red" "13:" "10:3"
-                    esac
+                    esac ||
+    return 1
 }
 
 

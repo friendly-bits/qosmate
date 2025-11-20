@@ -172,7 +172,8 @@ apply_rules_htb() {
                 create_qdisc "htb_fq_codel quantum:300 targ_coeff:2" "150:" "1:15" &&
                 for family in ipv4 ipv6; do
                     create_filters "CS1" "1:15" "$family" || return 1
-                done
+                done ||
+    return 1
 }
 
 setup_htb() {
