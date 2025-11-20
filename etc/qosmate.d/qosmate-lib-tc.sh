@@ -152,24 +152,22 @@ create_qdisc() { create_tc_obj "$1" QDISC "$2" "$3"; }
 create_tc_obj() {
     unexp_helper() { error_out "Unexpected $tc_obj_type helper '$helper_short'."; }
     params_confusion() { error_out "TC object is $tc_obj_type but $1 params are set: '$2'"; }
-    inval_obj() { error_out "create_tc_obj: Invalid object id '$tc_obj_id'"; }
-    inval_parent() { error_out "create_tc_obj: Invalid parent id '$tc_parent_id' for object '$tc_obj_id'"; }
 
     local helper_short helper_args  QDISC_PARAMS='' CLASS_PARAMS='' \
         helper_str="$1" tc_obj_type="$2" tc_obj_id="$3" tc_parent_id="$4"
 
     case "$tc_obj_id" in
-        *![0-9:]*) inval_obj; return 1 ;;
+        *![0-9:]*) false ;;
         ''|*[0-9]:*) ;;
-        *) inval_obj; return 1
-    esac
+        *) false
+    esac || { error_out "create_tc_obj: Invalid object id '$tc_obj_id'"; return 1; }
 
     case "$tc_parent_id" in
         root) tc_parent_id='' ;;
-        *![0-9:]*) inval_parent; return 1 ;;
+        *![0-9:]*) false ;;
         *[0-9]:*) ;;
-        *) inval_parent; return 1
-    esac
+        *) false
+    esac || { error_out "create_tc_obj: Invalid parent id '$tc_parent_id' for object '$tc_obj_id'"; return 1; }
 
     helper_short="${helper_str%% *}"
     helper_args="${helper_str#"$helper_short"}"
