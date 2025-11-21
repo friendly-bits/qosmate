@@ -4,7 +4,7 @@ The included `json-parser.sh` script can parse JSON files complying with the sup
 
 The parser automatically extracts TC object ID's (`handle` for TC qdisc, `class id` for TC class) and assigns that ID as parent ID to any child objects when generating the shell code.
 
-For an example of such generated shell code, see `qosmate.d/hfsc-qdisc-lib.sh`, function `apply_rules_hfsc()`.
+For an example of such generated shell code, see `qosmate.d/qosmate-lib-hfsc.sh`, function `apply_rules_hfsc()`.
 
 This is intended as a development feature. JSON files and parser are not installed on user devices.
 
@@ -39,7 +39,7 @@ No two JSON objects or keys at the same hierarchy level should be named with the
 "key": "value2"
 ```
 
-but the first occurence of `key` will be ignored.
+but all instances of `key` will be effectively ignored, except the last one.
 
 ### **General format rules**
 
@@ -60,7 +60,7 @@ The parser implements format validation and will error out when encountering inv
 
 #### **Helpers**
 
-`QDISC` and `CLASS` objects must specify a `helper` either as their first key, or their second key if `requires` is present. The helper must be a shortened name of a helper function defined in the shell context. For example, the following JSON structure: 
+`QDISC` and `CLASS` objects must specify a `helper` either as their first non-comment key, or their second non-comment key if the `requires` key is present. The value of `helper` must be a shortened name of a helper function defined in the shell context. For example, the following JSON structure: 
 
 ```
 "QDISC_1": {
@@ -74,9 +74,11 @@ will be translated into following shell code:
 create_qdisc "test" "1:"
 ```
 
-During the shell code execution, the helper function `test_qdisc_helper()` will be called.
+During shell code execution, `create_qdisc()` will call `create_tc_obj()` which will call the helper function `test_qdisc_helper()`.
 
-The purpose of helper functions is to assemble parameters which are later used with the `tc` commands. Such parameters are always set via the global variable `$PARAMS`. Each time a `QDISC` or a `CLASS` object is specified, the `$PARAMS` variable is reset.
+Helper functions for `QDISC` and `CLASS` tc objects are implemented in `qosmate-lib-[cake|hfsc-hybrid|htb].sh` library scripts. These scripts are part of the core refactored qosmate code, rather than this 'extra' JSON parser. However because helpers must be specified in the json files for every TC object, the helper functionality is briefly explained in this document.
+
+The purpose of helper functions is to assemble parameters which are later used when issuing the `tc` commands. Such parameters are set via the global variables `$QDISC_PARAMS` and `CLASS_PARAMS`. Each time a `QDISC` or a `CLASS` tc object is prepared, both variables are reset. Then the helper function sets the parameters via the `$QDISC_PARAMS` variable if it's a qdisc helper, or `$CLASS_PARAMS` variable if it's a class helper.
 
 To pass arguments to the helper function, add the arguments to the value:
 
@@ -85,6 +87,15 @@ To pass arguments to the helper function, add the arguments to the value:
 	"helper": "test arg1 arg2"
 }
 ```
+
+The parser will translate above snippet into the following shell code:
+
+```
+create_qdisc "test" "1:" arg1 arg2
+```
+
+During shell code execution, `test_qdisc_helper()` will be called with arguments `arg1`, `arg2`.
+
 
 #### **Filters**
 
