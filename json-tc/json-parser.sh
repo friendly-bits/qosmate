@@ -140,10 +140,9 @@ traverse_obj() {
 		grandchild_keys grandchild_type \
 		curr_child_condition \
 		prev_child_condition='' \
-		condition_matched='' \
-		match_var match_err \
+		match_var \
 		json_child_type key val child_keys='' family families class_enums \
-		req_key req_val req_vals \
+		req_key req_vals \
 		pr_offset="$pr_offset" \
 		IFS="$DEFAULT_IFS" \
 			json_obj="$1" \
@@ -242,36 +241,20 @@ traverse_obj() {
 						done
 						json_select_h .. || return 1
 
-						if [ -z "$TRANSLATE_TO_SHELL" ]; then
-							if [ -n "$match_var" ]; then
-								condition_matched=
-								IFS="|"
-								for req_val in $req_vals; do
-									IFS="$DEFAULT_IFS"
-									[ -n "$req_val" ] || { match_err=1; break; }
-									eval "[ \"\$req_val\" = \"\${$match_var}\" ]" && { condition_matched=1; break; }
-								done
-								IFS="$DEFAULT_IFS"
-								[ -n "$match_err" ] && { match_failed "$val"; return 1; }
-								# ignore child obj if condition not matched
-								[ -n "$condition_matched" ] || continue
+						if [ "$curr_child_condition" != "$prev_child_condition" ]; then
+							if [ -n "$prev_child_condition" ]; then
+								dec_pr_offset
+								prev_line_err_check_req=''
+								printf '\n'
+								print_transl_line "esac"
 							fi
-						else
-							if [ "$curr_child_condition" != "$prev_child_condition" ]; then
-								if [ -n "$prev_child_condition" ]; then
-									dec_pr_offset
-									prev_line_err_check_req=''
-									printf '\n'
-									print_transl_line "esac"
-								fi
-								if [ -n "$curr_child_condition" ]; then
-									print_transl_line -no_err "case \"\$$match_var\" in ${req_vals})"
-									prev_line_err_check_req=''
-									inc_pr_offset
-								fi
+							if [ -n "$curr_child_condition" ]; then
+								print_transl_line -no_err "case \"\$$match_var\" in ${req_vals})"
+								prev_line_err_check_req=''
+								inc_pr_offset
 							fi
-							prev_child_condition="$curr_child_condition"
 						fi
+						prev_child_condition="$curr_child_condition"
 
 						traverse_obj "$key" "$traverse_parent_id" ;;
 					*) json_err "Unexpected key '$key'"; false
@@ -291,16 +274,12 @@ traverse_obj() {
 						esac || { json_err "Invalid tc parent id '$tc_parent_id' for tc object '$tc_obj_id'"; return 1; }
 
 						tc_obj_type="${json_obj%%_*}"
-						if [ -z "$TRANSLATE_TO_SHELL" ]; then
-							create_tc_obj "$val" "${tc_obj_type}" "$tc_obj_id" "$tc_parent_id" || return 1
-						else
-							case "$tc_obj_type" in
-								CLASS) tc_obj_type_lc=class ;;
-								QDISC) tc_obj_type_lc=qdisc ;;
-								*) json_err "Unexpected tc obj type '$tc_obj_type'."; return 1
-							esac
-							print_transl_line "create_${tc_obj_type_lc} \"$val\" \"$tc_obj_id\" \"$tc_parent_id\""
-						fi
+						case "$tc_obj_type" in
+							CLASS) tc_obj_type_lc=class ;;
+							QDISC) tc_obj_type_lc=qdisc ;;
+							*) json_err "Unexpected tc obj type '$tc_obj_type'."; return 1
+						esac
+						print_transl_line "create_${tc_obj_type_lc} \"$val\" \"$tc_obj_id\" \"$tc_parent_id\""
 						inc_pr_offset
 						continue ;;
 					*)
@@ -313,25 +292,14 @@ traverse_obj() {
 				case "$key" in
 					FILTERS)
 						families="ipv4 ipv6"
-						if [ -z "$TRANSLATE_TO_SHELL" ]; then
-							for family in $families; do
-								create_filters "$class_enums" "$tc_obj_id" "$family" || return 1
-							done
-						else
-							print_transl_line -no_err "for family in $families; do"
-							print_transl_line -no_err \
-								"${PR_OFFSET_UNIT}create_filters \"$class_enums\" \"$tc_obj_id\" \"\$family\" || return 1"
-							print_transl_line "done"
-						fi ;;
+						print_transl_line -no_err "for family in $families; do"
+						print_transl_line -no_err \
+							"${PR_OFFSET_UNIT}create_filters \"$class_enums\" \"$tc_obj_id\" \"\$family\" || return 1"
+						print_transl_line "done" ;;
 					FILTERS_IPV4|FILTERS_IPV6)
 						family="ipv${key#"FILTERS_IPV"}"
-
-						if [ -z "$TRANSLATE_TO_SHELL" ]; then
-							create_filters "$class_enums" "$tc_obj_id" "$family" || return 1
-						else
-							print_transl_line -no_err \
-								"create_filters \"$class_enums\" \"$tc_obj_id\" \"$family\" || return 1"
-						fi ;;
+						print_transl_line -no_err \
+							"create_filters \"$class_enums\" \"$tc_obj_id\" \"$family\" || return 1" ;;
 					*) json_err "Unexpected array '$key'"; return 1
 				esac
 				continue ;;
@@ -339,7 +307,7 @@ traverse_obj() {
 		esac || return 1
 	done
 
-	if [ -n "$TRANSLATE_TO_SHELL" ] && [ -n "$prev_child_condition" ]; then
+	if [ -n "$prev_child_condition" ]; then
 		dec_pr_offset
 		prev_line_err_check_req=''
 		printf '\n'
@@ -372,20 +340,13 @@ parse_json() {
 	traverse_obj "ROOT" "root"
 }
 
+error_out() {
+	printf '%s\n' "Error: $*" >&2
+}
 
-TRANSLATE_TO_SHELL=
-if [ -z "$APPLY_SOURCED" ]; then
-
-	error_out() {
-		printf '%s\n' "Error: $*" >&2
-	}
-
-	TRANSLATE_TO_SHELL=1
-
-	init_json_parser "$1" &&
-	parse_json &&
-	printf '%s\n%s\n' " ||" "return 1"
-	exit $?
-fi
+init_json_parser "$1" &&
+parse_json &&
+printf '%s\n%s\n' " ||" "return 1"
+exit $?
 
 :
