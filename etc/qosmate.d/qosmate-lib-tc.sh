@@ -3,11 +3,6 @@
 
 : "$MTU" "${gameqdisc:-}"
 
-# Print tc commands to console rather than running them - for testing/debugging
-tc() {
-    printf '%s\n' "tc $*" >&2
-}
-
 ## COMMON PARAM HELPERS
 
 unexp_qdisc() { error_out "Unexpected qdisc '$2' for tc object '$1'"; }
@@ -146,6 +141,21 @@ append_cake_link_params() {
 
 ## TC OBJECTS AND FILTERS
 
+del_root_qdiscs_and_ifb() {
+    local wan="$1" lan="$2"
+    [ -n "$wan" ] && [ -n "$lan" ] || { error_out "del_root_qdiscs_and_ifb: invalid args '$*'"; return 1; }
+
+    print_msg "Deleting existing ingress handle, IFB interface and root qdiscs (if any) for devices: ${wan}, ${lan}."
+    {
+        tc qdisc del dev "$wan" root
+        tc qdisc del dev "$lan" root
+        tc qdisc del dev "$wan" ingress
+        # Remove IFB interface
+        ip link del "$lan"
+    } > /dev/null 2>&1
+    :
+}
+
 create_class() { create_tc_obj "$1" CLASS "$2" "$3"; }
 create_qdisc() { create_tc_obj "$1" QDISC "$2" "$3"; }
 
@@ -254,8 +264,11 @@ create_filters() {
 ##############################
 
 setup_tc() {
+    LAN=ifb-$WAN
+
     try_setup_tc || {
         error_out "Failed to set up $ROOT_QDISC root qdisc."
+        del_root_qdiscs_and_ifb "$WAN" "$LAN"
         # *** Any additional error handling needed? ***
         exit 1
     }
@@ -267,7 +280,6 @@ try_setup_tc() {
         return 1
     }
 
-    LAN=ifb-$WAN
     MTU=1500
 
     # Ensure rates/packetsize are non-zero to avoid errors in calculations
@@ -285,12 +297,28 @@ try_setup_tc() {
 
     print_msg "" "Setting up ctinfo downstream shaping..."
 
-    # Set up ingress handle for WAN interface
-    tc qdisc add dev "$WAN" handle ffff: ingress &&
+    ## Delete the old qdiscs and IFB associated with the old WAN interface
+    OLD_WAN='' OLD_LAN=''
+    [ -f "/tmp/qosmate_wan" ] &&
+    OLD_WAN=$(cat /tmp/qosmate_wan 2>/dev/null) &&
+    [ -n "$OLD_WAN" ] &&
+    OLD_LAN="ifb-${OLD_WAN}" &&
+    del_root_qdiscs_and_ifb "$OLD_WAN" "$OLD_LAN"
+
+    # Save the current WAN interface to a temporary file
+    printf '%s\n' "$WAN" > /tmp/qosmate_wan
+
+    # Make sure root and ingress qdiscs for $WAN, $LAN do not exist
+    if { [ "$WAN" != "$OLD_WAN" ] || [ "$LAN" != "$OLD_LAN" ]; }; then
+        del_root_qdiscs_and_ifb "$WAN" "$LAN" || exit 1
+    fi
 
     # Create IFB interface
     ip link add name "$LAN" type ifb &&
     ip link set "$LAN" up &&
+
+    # Set up ingress handle for WAN interface
+    tc qdisc add dev "$WAN" handle ffff: ingress &&
 
     # Redirect ingress traffic from WAN to IFB and restore DSCP from conntrack
     tc filter add dev "$WAN" parent ffff: protocol all matchall action ctinfo dscp 63 128 mirred \
