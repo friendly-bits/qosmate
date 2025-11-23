@@ -296,17 +296,17 @@ try_setup_tc() {
     tc filter add dev "$WAN" parent ffff: protocol all matchall action ctinfo dscp 63 128 mirred \
         egress redirect dev "$LAN" || return 1
 
-    print_msg "Applying $ROOT_QDISC queueing discipline."
-
-    local lib_file setup_cmd
+    local lib_file setup_cmd rqdisc_print
     case "$ROOT_QDISC" in
-        hfsc) lib_file="$QOSMATE_LIB_HFSC_HYBRID" setup_cmd=setup_hfsc ;;
-        hybrid) lib_file="$QOSMATE_LIB_HFSC_HYBRID" setup_cmd=setup_hybrid ;;
-        cake) lib_file="$QOSMATE_LIB_CAKE" setup_cmd=setup_cake ;;
-        htb) lib_file="$QOSMATE_LIB_HTB" setup_cmd=setup_htb
+        hfsc) lib_file="$QOSMATE_LIB_HFSC_HYBRID" setup_cmd=setup_hfsc rqdisc_print=HFSC ;;
+        hybrid) lib_file="$QOSMATE_LIB_HFSC_HYBRID" setup_cmd=setup_hybrid rqdisc_print="Hybrid (HFSC+CAKE)" ;;
+        cake) lib_file="$QOSMATE_LIB_CAKE" setup_cmd=setup_cake rqdisc_print=CAKE ;;
+        htb) lib_file="$QOSMATE_LIB_HTB" setup_cmd=setup_htb rqdisc_print=HTB
     esac
 
-    [ -f "$lib_file" ] || { error_out "Can not find $lib_file"; return 1; }
+    print_msg "Applying $rqdisc_print queueing discipline."
+
+    [ -f "$lib_file" ] || { error_out "Can not find '$lib_file'."; return 1; }
     # shellcheck source=/dev/null
     . "$lib_file"
     $setup_cmd || return 1
