@@ -1,6 +1,6 @@
 # TC rules in JSON format
 
-The included `json-parser.sh` script can parse JSON files complying with the supported format and translate them into shell code for automatic TC structure generation. Resulting shell code relies on certain functions in `qosmate.d/qosmate-tc-lib.sh`.
+The included `json-parser.sh` script can parse JSON files complying with the supported format and translate them into shell code for automatic TC structure generation. Resulting shell code relies on certain functions in `qosmate.d/qosmate-lib-tc.sh`.
 
 The parser automatically extracts TC object ID's (`handle` for TC qdisc, `class id` for TC class) and assigns that ID as parent ID to any child objects when generating the shell code.
 
@@ -91,7 +91,7 @@ To pass arguments to the helper function, add the arguments to the value:
 The parser will translate above snippet into the following shell code:
 
 ```
-create_qdisc "test" "1:" arg1 arg2
+create_qdisc "test arg1 arg2" "1:"
 ```
 
 During shell code execution, `test_qdisc_helper()` will be called with arguments `arg1`, `arg2`.
@@ -113,7 +113,7 @@ Filters may be specified via the following keys:
 
 #### **Logic**
 
-`QDISC`, `CLASS` and `LOGIC_BRANCH` objects may specify a `requires` key as their first key. The `requires` key is translated as a match of certain supported shell variable values. If the value matches, the JSON object is processed, otherwise it is skipped. For example:
+`QDISC`, `CLASS` and `LOGIC_BRANCH` objects may specify a `requires` key as their first non-comment key. The `requires` key is translated as a `case` statement matching corresponding JSON value vs shell variable value, for certain supported shell variables. For example:
 
 ```
 "QDISC_1": {
