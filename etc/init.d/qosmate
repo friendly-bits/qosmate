@@ -1912,9 +1912,6 @@ start_service() {
 
     preserve_config_files # Add config files to sysupgrade.conf
 
-    # Save the current WAN interface to a temporary file
-    printf '%s\n' "$WAN" > /tmp/qosmate_wan
-
     /bin/sh "$QOSMATE_MAIN_SCRIPT" || { error_out "Failed to start qosmate."; return 1; }
 
     create_hotplug_script  # Create the hotplug script instead of downloading it
