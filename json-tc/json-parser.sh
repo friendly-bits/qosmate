@@ -75,7 +75,7 @@ get_json_arr() {
 		i=$((i+1))
 		json_get_type _type $i && [ -n "$_type" ] || break
 		get_json_var ga_val ${i} || return 1
-		ga_values="${ga_values}${ga_values:+ }${ga_val}"
+		ga_values="${ga_values}${ga_values:+"${_NL_}"}${ga_val}"
 	done
 	json_select_h .. || return 1
 	eval "$ga_out_var=\"\${ga_values}\""
@@ -102,23 +102,20 @@ get_child_keys() {
 }
 
 print_transl_line() {
-	local arg no_err='' nl='' pr_line=''
-	for arg in "$@"; do
-		case "$arg" in
-			-no_err) no_err=1; shift ;;
-			-nl) nl=1; shift ;;
-			*) pr_line="${pr_line}${pr_line:+ }${arg}"
-		esac
-	done
-	[ -n "$prev_line_err_check_req" ] && printf '%s\n' " &&"
-	case "$prev_pr_line" in
-		''|"case"*) ;;
-		*) [ -n "$nl" ] && printf '\n'
-	esac
-	printf '%s' "${pr_offset}${pr_line}"
+	local err_check_str=" &&"
+	if [ "$1" = "-end_check" ]; then
+		err_check_str=" || return 1"
+		shift
+	fi
+	if [ -n "$prev_line_err_check_req" ]; then
+		printf '%s\n' "${err_check_str}"
+	else
+		printf '\n'
+	fi
+	[ -n "$COMMENT" ] && printf '%s\n' "${pr_offset}# ${COMMENT}"
+	COMMENT=''
+	printf '%s' "${pr_offset}${1}"
 	prev_line_err_check_req=1
-	[ -n "$no_err" ] && { prev_line_err_check_req=''; printf '\n'; }
-	prev_pr_line="$pr_line"
 }
 
 
@@ -127,22 +124,122 @@ get_match_var() {
 	case "$2" in
 		direction) _var="DIR" ;;
 		gameqdisc) _var="gameqdisc" ;;
+		SFO_ENABLED) _var="SFO_ENABLED" ;;
 		*) false
 	esac || { json_err "Unexpected 'requires' match '$2'"; return 1; }
 	eval "$1=\"$_var\""
+}
+
+process_requires() {
+	local gc_keys gc_key gc_type \
+		req_key='' req_vals='' match_var='' term_delim='' \
+		condition='' condition_type='' condition_def='' condition_op='' condition_closure='' pr_con_line='' \
+		IFS="$DEFAULT_IFS" \
+		key="$1"
+
+	# check obj condition
+	json_select_h "$key" || return 1
+	get_child_keys gc_keys
+	for gc_key in $gc_keys; do
+		case "$gc_key" in
+			comment*) continue ;;
+			requires|requires_or)
+				json_get_type gc_type "$gc_key" &&
+				case "$gc_type" in
+					array)
+						condition_op="if"
+						condition_closure="fi"
+						get_json_arr condition_def "$gc_key" ;;
+					string)
+						condition_op="case"
+						condition_closure="esac"
+						get_json_var condition_def "$gc_key" ;;
+					*) false
+				esac &&
+				[ -n "$condition_def" ] || {
+					json_err "Failed to process key '$gc_key'"
+					return 1
+				}
+
+				condition_type="$gc_key"
+				condition="$condition_type:$condition_op:$condition_def"
+				break ;;
+			*) break
+		esac
+	done
+	json_select_h .. || return 1
+
+	if [ "$condition" != "$prev_condition" ]; then
+		if [ -n "$prev_condition" ]; then
+			case "$prev_condition_closure" in "esac"|"fi") ;;
+				*) json_err "Invalid prev condition closure '$prev_condition_closure'"; return 1
+			esac
+			print_transl_line -end_check "${prev_condition_closure}"
+			[ "$prev_condition_closure" = "fi" ] && prev_line_err_check_req=''
+			prev_condition_closure=
+			dec_pr_offset
+		fi
+
+		if [ -n "$condition" ]; then
+			inc_pr_offset
+			case "$condition" in
+				*:*:*:*) false ;;
+				*:*:*) ;;
+				*) false
+			esac &&
+			[ -n "$condition_type" ] && [ -n "$condition_op" ] && [ -n "$condition_def" ] ||
+				{ match_failed "$condition"; return 1; }
+
+			case "$condition_op" in
+				"if")
+					case "$condition_type" in
+						requires) term_delim="&&" ;;
+						requires_or) term_delim="||"
+					esac
+
+					pr_con_line=
+
+					IFS="${_NL_}"
+					for condition_line in $condition_def; do
+						IFS="$DEFAULT_IFS"
+
+						req_key="${condition_line%%=*}" &&
+						req_vals="${condition_line#"$req_key"}" &&
+						req_vals="${req_vals#=}" &&
+						[ -n "$req_vals" ] || { match_failed "$condition_line"; return 1; }
+
+						get_match_var match_var "$req_key" || return 1
+						pr_con_line="${pr_con_line}${pr_con_line:+" $term_delim "}[ \"\$$match_var\" = \"$req_vals\" ]"
+					done
+					IFS="$DEFAULT_IFS"
+					print_transl_line -end_check "if ${pr_con_line}; then"
+					prev_line_err_check_req=''
+					;;
+				"case")
+					req_key="${condition_def%%=*}" &&
+					req_vals="${condition_def#"$req_key"}" &&
+					req_vals="${req_vals#=}" &&
+					[ -n "$req_vals" ] || { match_failed "$condition_def"; return 1; }
+
+					get_match_var match_var "$req_key" || return 1
+					print_transl_line "case \"\$$match_var\" in ${req_vals})"
+					prev_line_err_check_req=''
+					;;
+			esac
+		fi
+		prev_condition="$condition"
+		prev_condition_closure="$condition_closure"
+	fi
+	:
 }
 
 traverse_obj() {
 	helper_missing() { json_err "No helper specified for object '$json_obj'."; }
 	match_failed () { json_err "Failed to parse 'requires' statement '$1'."; }
 
-	local tc_obj_id='' tc_obj_type tc_obj_type_lc \
-		grandchild_keys grandchild_type \
-		curr_child_condition \
-		prev_child_condition='' \
-		match_var \
+	local tc_obj_id="$tc_obj_id" tc_obj_type tc_obj_type_lc \
+		prev_condition='' prev_condition_closure='' \
 		json_child_type key val child_keys='' family families class_enums \
-		req_key req_vals \
 		pr_offset="$pr_offset" \
 		IFS="$DEFAULT_IFS" \
 			json_obj="$1" \
@@ -170,8 +267,10 @@ traverse_obj() {
 
 	case "$json_obj" in
 		ROOT) ;;
-		LOGIC_BRANCH*) local REQUIRES_EXPECTED=1 ;;
+		LOGIC_BRANCH*)
+			local REQUIRES_EXPECTED=1 ;;
 		QDISC*|CLASS_*)
+			inc_pr_offset
 			local HELPER_REQ=1 REQUIRES_EXPECTED=1
 
 			tc_obj_id="${tc_obj_id//_/:}"
@@ -193,7 +292,7 @@ traverse_obj() {
 
 		case "$key" in
 			comment*) ;;
-			requires)
+			requires|requires_or)
 				[ -n "$REQUIRES_EXPECTED" ] &&
 					REQUIRES_EXPECTED='' ;;
 			helper)
@@ -213,49 +312,7 @@ traverse_obj() {
 			object)
 				case "$key" in
 					QDISC*|CLASS_*|LOGIC_BRANCH*)
-						# check obj condition
-						curr_child_condition='' req_key='' req_vals='' match_var=''
-						json_select_h "$key" || return 1
-						get_child_keys grandchild_keys
-						for gc_key in $grandchild_keys; do
-							case "$gc_key" in
-								comment*) continue ;;
-								requires)
-									json_get_type grandchild_type "$gc_key" &&
-									[ "$grandchild_type" = string ] &&
-									get_json_var curr_child_condition "$gc_key" &&
-									[ -n "$curr_child_condition" ] || {
-										json_err "Failed to process key '$gc_key'"
-										return 1
-									}
-
-									req_key="${curr_child_condition%%=*}"
-									req_vals="${curr_child_condition#"$req_key"}"
-									req_vals="${req_vals#=}"
-
-									[ -n "$req_vals" ] || { match_failed "$curr_child_condition"; return 1; }
-									get_match_var match_var "$req_key" || return 1
-									break ;;
-								*) break
-							esac
-						done
-						json_select_h .. || return 1
-
-						if [ "$curr_child_condition" != "$prev_child_condition" ]; then
-							if [ -n "$prev_child_condition" ]; then
-								dec_pr_offset
-								prev_line_err_check_req=''
-								printf '\n'
-								print_transl_line "esac"
-							fi
-							if [ -n "$curr_child_condition" ]; then
-								print_transl_line -no_err "case \"\$$match_var\" in ${req_vals})"
-								prev_line_err_check_req=''
-								inc_pr_offset
-							fi
-						fi
-						prev_child_condition="$curr_child_condition"
-
+						process_requires "$key" || return 1
 						traverse_obj "$key" "$traverse_parent_id" ;;
 					*) json_err "Unexpected key '$key'"; false
 				esac || return 1
@@ -263,7 +320,7 @@ traverse_obj() {
 			string)
 				get_json_var val "$key" || return 1
 				case "$key" in
-					comment*) print_transl_line -nl -no_err "# ${val}" ;;
+					comment*) COMMENT="${val}" ;;
 					requires) ;; # processed by the parent json obj
 					helper)
 						case "$tc_parent_id" in
@@ -280,7 +337,6 @@ traverse_obj() {
 							*) json_err "Unexpected tc obj type '$tc_obj_type'."; return 1
 						esac
 						print_transl_line "create_${tc_obj_type_lc} \"$val\" \"$tc_obj_id\" \"$tc_parent_id\""
-						inc_pr_offset
 						continue ;;
 					*)
 						json_err "Unexpected string/int key '$key'"
@@ -291,15 +347,22 @@ traverse_obj() {
 				get_json_arr class_enums "$key" || return 1
 				case "$key" in
 					FILTERS)
+						inc_pr_offset
 						families="ipv4 ipv6"
-						print_transl_line -no_err "for family in $families; do"
-						print_transl_line -no_err \
-							"${PR_OFFSET_UNIT}create_filters \"$class_enums\" \"$tc_obj_id\" \"\$family\" || return 1"
-						print_transl_line "done" ;;
+						print_transl_line "for family in $families; do"
+						inc_pr_offset
+						prev_line_err_check_req=''
+						print_transl_line \
+							"create_filters \"${class_enums//"$_NL_"/ }\" \"$tc_obj_id\" \"\$family\""
+						dec_pr_offset
+						print_transl_line -end_check "done"
+						dec_pr_offset ;;
 					FILTERS_IPV4|FILTERS_IPV6)
 						family="ipv${key#"FILTERS_IPV"}"
-						print_transl_line -no_err \
-							"create_filters \"$class_enums\" \"$tc_obj_id\" \"$family\" || return 1" ;;
+						print_transl_line \
+							"${PR_OFFSET_UNIT}create_filters \"${class_enums//"$_NL_"/ }\" \"$tc_obj_id\" \"$family\""
+						;;
+					requires|requires_or) ;; # processed by the parent json obj
 					*) json_err "Unexpected array '$key'"; return 1
 				esac
 				continue ;;
@@ -307,11 +370,10 @@ traverse_obj() {
 		esac || return 1
 	done
 
-	if [ -n "$prev_child_condition" ]; then
+	if [ -n "$prev_condition" ]; then
+		print_transl_line -end_check "${prev_condition_closure}"
 		dec_pr_offset
-		prev_line_err_check_req=''
-		printf '\n'
-		print_transl_line "esac"
+		[ "$prev_condition_closure" = "fi" ] && prev_line_err_check_req=''
 	fi
 
 	[ -n "$HELPER_REQ" ] && {
@@ -345,8 +407,13 @@ error_out() {
 }
 
 init_json_parser "$1" &&
-parse_json &&
-printf '%s\n%s\n' " ||" "return 1"
-exit $?
+parse_json
+rv=$?
 
-:
+if [ $rv = 0 ] && [ -n "$prev_line_err_check_req" ]; then
+	printf '%s\n%s\n' " ||" "return 1"
+else
+	printf '\n'
+fi
+
+exit $rv
