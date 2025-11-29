@@ -14,7 +14,11 @@
 					"comment": "Priority class gets fq_codel with aggressive settings",
 					"helper": "htb_fq_codel quantum:300"
 				},
-				"FILTERS": [ "EF", "CS5", "CS6", "CS7" ]
+
+				"FILTERS": {
+					"requires_or": [ "direction=DOWN", "SFO_ENABLED=1" ],
+					"enums": [ "EF", "CS5", "CS6", "CS7" ]
+				}
 			},
 
 			"CLASS_1_13": {
@@ -24,7 +28,11 @@
 					"comment": "Best effort with standard settings",
 					"helper": "htb_fq_codel quantum:1500"
 				},
-				"FILTERS_IPV6": [ "CS0" ]
+
+				"FILTERS_IPV6": {
+					"requires_or": [ "direction=DOWN", "SFO_ENABLED=1" ],
+					"enums": [ "CS0" ]
+				}
 			},
 
 			"CLASS_1_15": {
@@ -34,7 +42,11 @@
 					"comment": "Background with larger target",
 					"helper": "htb_fq_codel quantum:300 targ_coeff:2"
 				},
-				"FILTERS": [ "CS1" ]
+
+				"FILTERS": {
+					"requires_or": [ "direction=DOWN", "SFO_ENABLED=1" ],
+					"enums": [ "CS1" ]
+				}
 			}
 
 		}

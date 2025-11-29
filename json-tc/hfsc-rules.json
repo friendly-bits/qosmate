@@ -20,7 +20,7 @@
 				"helper": "hfsc_tin fast",
 
 				"QDISC": { "helper": "hfsc_non_game" },
-				"FILTERS": [ "CS4", "AF41", "AF42" ]
+				"FILTERS": { "enums": [ "CS4", "AF41", "AF42" ] }
 			},
 
 			"CLASS_1_13": {
@@ -28,7 +28,7 @@
 				"helper": "hfsc_tin normal",
 
 				"QDISC": { "helper": "hfsc_non_game" },
-				"FILTERS": [ "CS0" ]
+				"FILTERS": { "enums": [ "CS0" ] }
 			},
 
 			"CLASS_1_14": {
@@ -36,7 +36,7 @@
 				"helper": "hfsc_tin lowprio",
 
 				"QDISC": { "helper": "hfsc_non_game" },
-				"FILTERS": [ "CS2", "AF11" ]
+				"FILTERS": { "enums": [ "CS2", "AF11" ] }
 			},
 
 			"CLASS_1_15": {
@@ -44,30 +44,30 @@
 				"helper": "hfsc_tin bulk",
 
 				"QDISC": { "helper": "hfsc_non_game" },
-				"FILTERS": [ "CS1" ]
+				"FILTERS": { "enums": [ "CS1" ] }
 			},
 
 			"CLASS_1_11": {
 				"comment": "Game qdisc - Realtime",
 				"helper": "hfsc_tin realtime",
 
-				"FILTERS": [ "EF", "CS5", "CS6", "CS7" ],
+				"FILTERS": { "enums": [ "EF", "CS5", "CS6", "CS7" ] },
 
 				"QDISC_10": {
 					"helper": "hfsc_game",
 
 					"CLASS_10_1": {
-						"requires": "gameqdisc=drr|qfq",
+						"requires_or": [ "gameqdisc=drr", "gameqdisc=qfq" ],
 						"helper": "game_drr_qfq 8000",
 						"QDISC_11": { "helper": "red" }
 					},
 					"CLASS_10_2": {
-						"requires": "gameqdisc=drr|qfq",
+						"requires_or": [ "gameqdisc=drr", "gameqdisc=qfq" ],
 						"helper": "game_drr_qfq 4000",
 						"QDISC_12": { "helper": "red" }
 					},
 					"CLASS_10_3": {
-						"requires": "gameqdisc=drr|qfq",
+						"requires_or": [ "gameqdisc=drr", "gameqdisc=qfq" ],
 						"helper": "game_drr_qfq 1000",
 						"QDISC_13": { "helper": "red" }
 					}
