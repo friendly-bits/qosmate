@@ -39,27 +39,10 @@ json_select_h() {
 	:
 }
 
-# Check that expression is safe for RHS of eval
-check_shell_expr() {
-	local s="$1"
-	trim_spaces s
-	case "$s" in
-		*[!a-zA-Z0-9'_.(){}+-*/%?$!&><=#: ']* ) ;; # only allow these characters
-		*\\*|*\$\([!\(]* ) ;; # disallow backslash and subshells
-		*) return 0
-	esac
-	json_err "Unsupported shell epxression '$1'."
-	return 1
-}
-
 get_json_var() {
-	local gv_out_var="$1" gv_key="$2" gv_val="$3"
-	[ -n "$gv_val" ] || json_get_var gv_val "$gv_key" &&
-	case "$gv_val" in
-		*\$[a-zA-Z_\{\(]* )
-			check_shell_expr "$gv_val" &&
-			eval "gv_val=\"$gv_val\"" ;;
-	esac || { json_err "Failed to get var value." "$gv_key"; return 1; }
+	local gv_out_var="$1" gv_key="$2"
+	eval "$gv_out_var="
+	json_get_var gv_val "$gv_key" || { json_err "Failed to get var value." "$gv_key"; return 1; }
 
 	eval "$gv_out_var=\"\${gv_val}\""
 }
