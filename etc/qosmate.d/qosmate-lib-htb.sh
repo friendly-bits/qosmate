@@ -155,25 +155,30 @@ apply_rules_htb() {
             # Priority class for realtime/gaming traffic
             create_class "htb_tin realtime" "1:11" "1:1" &&
                 # Priority class gets fq_codel with aggressive settings
-                create_qdisc "htb_fq_codel quantum:300" "110:" "1:11" &&
-                for family in ipv4 ipv6; do
-                    create_filters "EF CS5 CS6 CS7" "1:11" "$family" || return 1
-                done &&
+                create_qdisc "htb_fq_codel quantum:300" "110:" "1:11" || return 1
+                if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
+                    for family in ipv4 ipv6; do
+                        create_filters "EF CS5 CS6 CS7" "1:11" "$family" || return 1
+                    done || return 1
+                fi
 
             # Best Effort - default traffic
             create_class "htb_tin default" "1:13" "1:1" &&
                 # Best effort with standard settings
-                create_qdisc "htb_fq_codel quantum:1500" "130:" "1:13" &&
-                create_filters "CS0" "1:13" "ipv6" || return 1
+                create_qdisc "htb_fq_codel quantum:1500" "130:" "1:13" || return 1
+                if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
+                    create_filters "CS0" "1:13" "ipv6" || return 1
+                fi
 
             # Background/Bulk - low priority
             create_class "htb_tin bulk" "1:15" "1:1" &&
                 # Background with larger target
-                create_qdisc "htb_fq_codel quantum:300 targ_coeff:2" "150:" "1:15" &&
-                for family in ipv4 ipv6; do
-                    create_filters "CS1" "1:15" "$family" || return 1
-                done ||
-    return 1
+                create_qdisc "htb_fq_codel quantum:300 targ_coeff:2" "150:" "1:15" || return 1
+                if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
+                    for family in ipv4 ipv6; do
+                        create_filters "CS1" "1:15" "$family" || return 1
+                    done || return 1
+                fi
 }
 
 setup_htb() {
