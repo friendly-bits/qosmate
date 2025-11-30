@@ -40,7 +40,7 @@ but all instances of `key` will be effectively ignored, except the last one.
 ## **General format rules**
 
 - JSON file must encode hierarchical structure with enclosed objects representing child TC objects of enclosing objects, with the exception of FILTERS[_IPV4|_IPV6]
-- FILTERS[_IPV4|_IPV6] are always attached to the root qdisc - `1:`. Their position in the hierarchy represents where the filter redirects traffic **to**.
+- FILTERS[_IPV4|_IPV6] are attached to the qdisc specified via the `attach_to` key. Their position in the JSON hierarchy represents where the filter redirects traffic **to**.
 - All JSON keys must only include alphanumeric characters and underlines (`_`)
 - Only supported objects and keys are allowed
 
@@ -103,11 +103,11 @@ Filters may be specified via the following keys:
 - `FILTERS`: translates to "create specified filters for both ipv4 and ipv6"
 - `FILTERS_IPV4`, `FILTERS_IPV6`: translates to "create specified filters for given IP family"
 
-`FILTERS[_*]` must always be JSON objects and they always must include the `enums` array, e.g.:
+`FILTERS[_*]` must always be JSON objects and they always must include the `attach_to` string and the `enums` array, e.g.:
 
 ```
-"FILTERS": { "enums": [ "CS0" ] },
-"FILTERS_IPV6": { "enums": [ "CS0", "EF" ] }
+"FILTERS": { "attach_to": "1:", "enums": [ "CS0" ] },
+"FILTERS_IPV6": { "attach_to": "1:", "enums": [ "CS0", "EF" ] }
 ```
 
 `FILTERS[_*]` may include a `requires[_or|_and]` key to make them conditional, e.g.:
@@ -117,6 +117,7 @@ Filters may be specified via the following keys:
 	"helper": "htb_tin bulk",
 	"FILTERS": {
 		"requires_or": [ "direction": "DOWN", "SFO_ENABLED=1" ],
+		"attach_to": "1:",
 		"enums": [ "CS1" ]
 	}
 }
@@ -128,14 +129,14 @@ Above example will be translated into following shell code:
 create_class "htb_tin bulk" "1:15" "1:1" || return 1
 	if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
 		for family in ipv4 ipv6; do
-			create_filters "CS1" "1:15" "$family" || return 1
+			create_filters "1:" "CS1" "1:15" "$family" || return 1
 		done
 	fi
 ```
 
 ### **Logic**
 
-`QDISC`, `CLASS`, `FILTERS` and `LOGIC_BRANCH` objects may specify a `requires[_or|_and]` key as their first non-comment key. The `requires` key is translated logic matching corresponding JSON values vs shell variable values, for certain supported shell variables.
+`QDISC`, `CLASS`, `FILTERS` and `LOGIC_BRANCH` objects may specify a `requires[_or|_and]` key as their first non-comment key. The `requires` key is translated into logic matching corresponding JSON values vs shell variable values, for certain supported shell variables.
 
 - `requires` JSON values must be of type `string`, e.g. `"requires": "direction=DOWN"`. They only match one variable and one value.
 
@@ -157,7 +158,7 @@ create_class "htb_tin bulk" "1:15" "1:1" || return 1
   fi
   ```
 
-  If all `requires_or` terms match against the same shell variable, e.g. `"requires_or": [ "gameqdisc=drr", "gameqdisc=qfq" ]`, this will be translated into a `case` statement:
+  If all `requires_or` terms match against the same shell variable, e.g. `"requires_or": [ "gameqdisc=drr", "gameqdisc=qfq" ]`, this will be translated as a `case` statement:
 
   ```
   case "$gameqdisc" in 'drr'|'qfq')

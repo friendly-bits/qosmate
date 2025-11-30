@@ -158,7 +158,7 @@ apply_rules_htb() {
                 create_qdisc "htb_fq_codel quantum:300" "110:" "1:11" || return 1
                 if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
                     for family in ipv4 ipv6; do
-                        create_filters "EF CS5 CS6 CS7" "1:11" "$family" || return 1
+                        create_filters "1:" "EF CS5 CS6 CS7" "1:11" "$family" || return 1
                     done || return 1
                 fi
 
@@ -167,7 +167,7 @@ apply_rules_htb() {
                 # Best effort with standard settings
                 create_qdisc "htb_fq_codel quantum:1500" "130:" "1:13" || return 1
                 if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
-                    create_filters "CS0" "1:13" "ipv6" || return 1
+                    create_filters "1:" "CS0" "1:13" "ipv6" || return 1
                 fi
 
             # Background/Bulk - low priority
@@ -176,7 +176,7 @@ apply_rules_htb() {
                 create_qdisc "htb_fq_codel quantum:300 targ_coeff:2" "150:" "1:15" || return 1
                 if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
                     for family in ipv4 ipv6; do
-                        create_filters "CS1" "1:15" "$family" || return 1
+                        create_filters "1:" "CS1" "1:15" "$family" || return 1
                     done || return 1
                 fi
 }

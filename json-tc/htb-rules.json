@@ -17,6 +17,7 @@
 
 				"FILTERS": {
 					"requires_or": [ "direction=DOWN", "SFO_ENABLED=1" ],
+					"attach_to": "1:",
 					"enums": [ "EF", "CS5", "CS6", "CS7" ]
 				}
 			},
@@ -31,6 +32,7 @@
 
 				"FILTERS_IPV6": {
 					"requires_or": [ "direction=DOWN", "SFO_ENABLED=1" ],
+					"attach_to": "1:",
 					"enums": [ "CS0" ]
 				}
 			},
@@ -45,6 +47,7 @@
 
 				"FILTERS": {
 					"requires_or": [ "direction=DOWN", "SFO_ENABLED=1" ],
+					"attach_to": "1:",
 					"enums": [ "CS1" ]
 				}
 			}

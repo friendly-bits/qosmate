@@ -20,7 +20,7 @@
 				"helper": "hfsc_tin fast",
 
 				"QDISC": { "helper": "hfsc_non_game" },
-				"FILTERS": { "enums": [ "CS4", "AF41", "AF42" ] }
+				"FILTERS": { "attach_to": "1:", "enums": [ "CS4", "AF41", "AF42" ] }
 			},
 
 			"CLASS_1_13": {
@@ -28,7 +28,7 @@
 				"helper": "hfsc_tin normal",
 
 				"QDISC": { "helper": "hfsc_non_game" },
-				"FILTERS": { "enums": [ "CS0" ] }
+				"FILTERS": { "attach_to": "1:", "enums": [ "CS0" ] }
 			},
 
 			"CLASS_1_14": {
@@ -36,7 +36,7 @@
 				"helper": "hfsc_tin lowprio",
 
 				"QDISC": { "helper": "hfsc_non_game" },
-				"FILTERS": { "enums": [ "CS2", "AF11" ] }
+				"FILTERS": { "attach_to": "1:", "enums": [ "CS2", "AF11" ] }
 			},
 
 			"CLASS_1_15": {
@@ -44,14 +44,14 @@
 				"helper": "hfsc_tin bulk",
 
 				"QDISC": { "helper": "hfsc_non_game" },
-				"FILTERS": { "enums": [ "CS1" ] }
+				"FILTERS": { "attach_to": "1:", "enums": [ "CS1" ] }
 			},
 
 			"CLASS_1_11": {
 				"comment": "Game qdisc - Realtime",
 				"helper": "hfsc_tin realtime",
 
-				"FILTERS": { "enums": [ "EF", "CS5", "CS6", "CS7" ] },
+				"FILTERS": { "attach_to": "1:", "enums": [ "EF", "CS5", "CS6", "CS7" ] },
 
 				"QDISC_10": {
 					"helper": "hfsc_game",

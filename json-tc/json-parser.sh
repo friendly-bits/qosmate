@@ -292,7 +292,24 @@ process_requires() {
 
 traverse_obj() {
 	unexp_key() { json_err "'$1' is not expected here."; }
-	needed_key_missing() { json_err "No $1 specified for object '$json_obj'."; }
+	needed_keys_missing() { json_err "Required keys '$1' not specified in object '$json_obj'."; }
+
+	assert_valid_tc_type() {
+		case "$1" in
+			QDISC|CLASS) ;;
+			*) json_err "Invalid tc ${2:+"$2 "}object type '$1'"; return 1
+		esac
+	}
+
+	assert_valid_tc_id() {
+		case "$1" in
+			root|'') [ "$2" = QDISC ] ;;
+			*[!0-9:]*) false ;;
+			*[0-9]:*) ;;
+			*) false
+		esac || { json_err "Invalid tc ${3:+"$3 "}id '$1'"; return 1; }
+	}
+
 	assert_json_type() {
 		case " $2 " in
 			*" $3 "*) return 0 ;;
@@ -301,16 +318,60 @@ traverse_obj() {
 		return 1
 	}
 
+	is_key_needed() {
+		case " ${keys_needed} " in
+			*" ${1} "*) return 0
+		esac
+		return 1
+	}
+
+	# removes keys from list $keys_needed
+	keys_not_needed() {
+		local k keys_spaced=" ${keys_needed} "
+		for k in "$@"; do
+			is_key_needed "$k" || continue
+			keys_spaced="${keys_spaced%%" $k "*} ${keys_spaced#*" $k "}"
+		done
+		keys_needed="$keys_spaced"
+		trim_spaces keys_needed
+	}
+
+	assert_no_keys_needed() {
+		[ -z "$keys_needed" ] || {
+			needed_keys_missing "$keys_needed"
+			return 1
+		}
+	}
+
+	assert_key_needed() {
+		is_key_needed "$1" && return 0
+		unexp_key "$1"
+		return 1
+	}
+
+	assert_keys_not_needed() {
+		local k missing=''
+		for k in "$@"; do
+			is_key_needed "$k" && missing="${missing:+${missing} }${k}"
+		done
+		[ -z "$missing" ] || { needed_keys_missing "$missing"; return 1; }
+	}
+
 	local tc_obj_id="$tc_obj_id" tc_obj_type tc_obj_type_lc \
-		key_needed='' requires_expected='' \
+		keys_needed='' requires_expected='' \
 		PREV_CONDITION='' PREV_CONDITION_CLOSURE='' \
 		json_child_type key val child_keys='' family families arr_vals \
+		filters_attach_to='' \
 		pr_offset="$pr_offset" \
 		IFS="$DEFAULT_IFS" \
 			json_obj="$1" \
-			tc_parent_id="$2"
+			tc_parent_id="$2" \
+			tc_parent_type="$3"
 
-	local traverse_parent_id="$tc_parent_id"
+	local traverse_parent_id="$tc_parent_id" traverse_parent_type="$tc_parent_type"
+
+	assert_valid_tc_type "$tc_parent_type" "parent" &&
+	assert_valid_tc_id "$tc_parent_id" "$tc_parent_type" "parent" || return 1
 
 	case "$json_obj" in
 		ROOT)
@@ -333,19 +394,20 @@ traverse_obj() {
 	case "$json_obj" in
 		ROOT) ;;
 		LOGIC_BRANCH*)
-			key_needed=requires requires_expected=1 ;;
+			keys_needed="requires" requires_expected=1 ;;
 		QDISC*|CLASS_*)
 			inc_pr_offset
-			key_needed=helper requires_expected=1
+			keys_needed="helper" requires_expected=1
 
 			tc_obj_id="${tc_obj_id//_/:}"
-			case "$tc_obj_id" in *[!0-9:]*)
-				json_err "Invalid result '$tc_obj_id' when translating object '$json_obj' to tc object id."
-				return 1
-			esac
-			traverse_parent_id="$tc_obj_id" ;;
+			tc_obj_type="${json_obj%%_*}"
+
+			assert_valid_tc_id "$tc_obj_id" "${json_obj%%"_"*}" "object" || return 1
+
+			traverse_parent_id="$tc_obj_id"
+			traverse_parent_type="$tc_obj_type" ;;
 		FILTERS|FILTERS_IPV4|FILTERS_IPV6)
-			key_needed=enums requires_expected=1 ;;
+			keys_needed="enums attach_to" requires_expected=1 ;;
 		*)
 			json_err "Unexpected object '$json_obj'!"
 			return 1
@@ -377,19 +439,12 @@ traverse_obj() {
 					requires_expected='' ;;
 
 			helper)
-				assert_json_type "$key" "$json_child_type" "string" || return 1
-				[ "$key_needed" = "helper" ] || { unexp_key "$key"; return 1; }
+				assert_json_type "$key" "$json_child_type" "string" &&
+				assert_key_needed "helper" || return 1
+				keys_not_needed "helper"
 
-				requires_expected='' key_needed=''
+				requires_expected=''
 
-				case "$tc_parent_id" in
-					root) ;;
-					*![0-9:]*) false ;;
-					*[0-9]:*) ;;
-					*) false
-				esac || { json_err "Invalid tc parent id '$tc_parent_id' for tc object '$tc_obj_id'"; return 1; }
-
-				tc_obj_type="${json_obj%%_*}"
 				case "$tc_obj_type" in
 					CLASS) tc_obj_type_lc=class ;;
 					QDISC) tc_obj_type_lc=qdisc ;;
@@ -397,11 +452,19 @@ traverse_obj() {
 				esac
 				print_transl_line "create_${tc_obj_type_lc} \"$val\" \"$tc_obj_id\" \"$tc_parent_id\"" ;;
 
-			enums)
-				assert_json_type "$key" "$json_child_type" "array" || return 1
-				[ "$key_needed" = "enums" ] || { unexp_key "$key"; return 1; }
+			attach_to)
+				assert_json_type "string" &&
+				assert_key_needed "attach_to" || return 1
+				keys_not_needed "attach_to"
+				filters_attach_to="$val" ;;
 
-				requires_expected='' key_needed=''
+			enums)
+				assert_json_type "$key" "$json_child_type" "array" &&
+				assert_key_needed "enums" &&
+				assert_keys_not_needed "attach_to" || return 1
+				keys_not_needed "enums" "attach_to"
+
+				requires_expected=''
 
 				case "$json_obj" in
 					FILTERS)
@@ -411,7 +474,7 @@ traverse_obj() {
 						inc_pr_offset
 						prev_line_err_check_req=''
 						print_transl_line \
-							"create_filters \"${arr_vals//"$_NL_"/ }\" \"$tc_obj_id\" \"\$family\""
+							"create_filters \"$filters_attach_to\" \"${arr_vals//"$_NL_"/ }\" \"$tc_obj_id\" \"\$family\""
 						dec_pr_offset
 						print_transl_line -end_check "done"
 						prev_line_err_check_req=''
@@ -419,21 +482,19 @@ traverse_obj() {
 					FILTERS_IPV4|FILTERS_IPV6)
 						family="ipv${json_obj#"FILTERS_IPV"}"
 						print_transl_line \
-							"${PR_OFFSET_UNIT}create_filters \"${arr_vals//"$_NL_"/ }\" \"$tc_obj_id\" \"$family\""
+							"${PR_OFFSET_UNIT}create_filters \"$filters_attach_to\" \"${arr_vals//"$_NL_"/ }\" \"$tc_obj_id\" \"$family\""
 						;;
 					*) unexp_key "$key"; return 1
 				esac ;;
 
 			QDISC*|CLASS_*|LOGIC_BRANCH*|FILTERS|FILTERS_IPV4|FILTERS_IPV6)
-				assert_json_type "$key" "$json_child_type" "object" || return 1
+				assert_json_type "$key" "$json_child_type" "object" &&
+				assert_no_keys_needed || return 1
+
 				requires_expected=''
-				[ -z "$key_needed" ] || {
-					needed_key_missing "$key_needed"
-					return 1
-				}
 
 				process_requires "$key" &&
-				traverse_obj "$key" "$traverse_parent_id" || return 1 ;;
+				traverse_obj "$key" "$traverse_parent_id" "$traverse_parent_type" || return 1 ;;
 
 			*) unexp_key "$key"; return 1
 
@@ -446,10 +507,7 @@ traverse_obj() {
 		[ "$PREV_CONDITION_CLOSURE" = "fi" ] && prev_line_err_check_req=''
 	fi
 
-	[ -z "$key_needed" ] || {
-		needed_key_missing "$key_needed"
-		return 1
-	}
+	assert_no_keys_needed || return 1
 
 	case "$json_obj" in
 		ROOT) ;;
@@ -469,7 +527,7 @@ init_json_parser() {
 }
 
 parse_json() {
-	traverse_obj "ROOT" "root"
+	traverse_obj "ROOT" "root" "QDISC"
 }
 
 error_out() {

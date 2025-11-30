@@ -299,34 +299,34 @@ apply_rules_hfsc() {
             create_class "hfsc_tin fast" "1:12" "1:1" &&
                 create_qdisc "hfsc_non_game" "" "1:12" || return 1
                 for family in ipv4 ipv6; do
-                    create_filters "CS4 AF41 AF42" "1:12" "$family" || return 1
+                    create_filters "1:" "CS4 AF41 AF42" "1:12" "$family" || return 1
                 done
 
             # Normal (Default)
             create_class "hfsc_tin normal" "1:13" "1:1" &&
                 create_qdisc "hfsc_non_game" "" "1:13" || return 1
                 for family in ipv4 ipv6; do
-                    create_filters "CS0" "1:13" "$family" || return 1
+                    create_filters "1:" "CS0" "1:13" "$family" || return 1
                 done
 
             # Low Prio
             create_class "hfsc_tin lowprio" "1:14" "1:1" &&
                 create_qdisc "hfsc_non_game" "" "1:14" || return 1
                 for family in ipv4 ipv6; do
-                    create_filters "CS2 AF11" "1:14" "$family" || return 1
+                    create_filters "1:" "CS2 AF11" "1:14" "$family" || return 1
                 done
 
             # Bulk
             create_class "hfsc_tin bulk" "1:15" "1:1" &&
                 create_qdisc "hfsc_non_game" "" "1:15" || return 1
                 for family in ipv4 ipv6; do
-                    create_filters "CS1" "1:15" "$family" || return 1
+                    create_filters "1:" "CS1" "1:15" "$family" || return 1
                 done
 
             # Game qdisc - Realtime
             create_class "hfsc_tin realtime" "1:11" "1:1" || return 1
                 for family in ipv4 ipv6; do
-                    create_filters "EF CS5 CS6 CS7" "1:11" "$family" || return 1
+                    create_filters "1:" "EF CS5 CS6 CS7" "1:11" "$family" || return 1
                 done
                 create_qdisc "hfsc_game" "10:" "1:11" &&
                     case "$gameqdisc" in 'drr'|'qfq')
@@ -354,19 +354,19 @@ apply_rules_hybrid() {
             # CAKE (most traffic - default)
             create_class "hybrid_tin normal" "1:13" "1:1" &&
                 create_qdisc "hybrid_cake" "13:" "1:13" &&
-                create_filters "CS0" "1:13" "ipv6" &&
+                create_filters "1:" "CS0" "1:13" "ipv6" &&
 
             # Bulk traffic (HFSC LS + fq_codel)
             create_class "hybrid_tin bulk" "1:15" "1:1" &&
                 create_qdisc "hfsc_fq_codel -mem-coeff 1" "15:" "1:15" || return 1
                 for family in ipv4 ipv6; do
-                    create_filters "CS1" "1:15" "$family" || return 1
+                    create_filters "1:" "CS1" "1:15" "$family" || return 1
                 done
 
             # High priority realtime (HFSC RT + gameqdisc)
             create_class "hfsc_tin realtime" "1:11" "1:1" || return 1
                 for family in ipv4 ipv6; do
-                    create_filters "EF CS5 CS6 CS7" "1:11" "$family" || return 1
+                    create_filters "1:" "EF CS5 CS6 CS7" "1:11" "$family" || return 1
                 done
                 create_qdisc "hfsc_game" "10:" "1:11" &&
                     case "$gameqdisc" in 'drr'|'qfq')

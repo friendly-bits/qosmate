@@ -219,14 +219,16 @@ create_tc_obj() {
         }
 }
 
-# 1 - filter list (class enum)
-# 2 - class id
-# 3 - family (ipv4|ipv6)
+# 1 - qdisc id to attach to
+# 2 - filter list (class enum)
+# 3 - class id
+# 4 - family (ipv4|ipv6)
 create_filters() {
     local dsfield hex_match proto prio match_str class_enum \
-        class_enums="$1" \
-        class_id="$2" \
-        family="$3"
+        qdisc_id="$1" \
+        class_enums="$2" \
+        class_id="$3" \
+        family="$4"
 
     for class_enum in $class_enums; do
         case "$class_enum" in
@@ -250,9 +252,9 @@ create_filters() {
         esac
 
         # shellcheck disable=SC2086
-        tc filter add dev "$DEV" parent 1: protocol "$proto" prio "$prio" u32 match $match_str classid "$class_id" || {
+        tc filter add dev "$DEV" parent "$qdisc_id" protocol "$proto" prio "$prio" u32 match $match_str classid "$class_id" || {
             error_out "Failed to create tc filter." \
-                "DEV:'$DEV', proto:'$proto', prio:'$prio', match:'$match_str', class:'$class_id'"
+                "DEV:'$DEV', parent:'$qdisc_id', proto:'$proto', prio:'$prio', match:'$match_str', class:'$class_id'"
             return 1
         }
     done
