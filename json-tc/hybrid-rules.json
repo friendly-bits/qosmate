@@ -15,22 +15,38 @@
 			"CLASS_1_13": {
 				"comment": "CAKE (most traffic - default)",
 				"helper": "hybrid_tin normal",
+
 				"QDISC_13": { "helper": "hybrid_cake" },
-				"FILTERS_IPV6": { "attach_to": "1:", "enums": [ "CS0" ] }
+
+				"FILTERS_IPV6": {
+					"requires_or": [ "direction=DOWN", "SFO_ENABLED=1" ],
+					"attach_to": "1:",
+					"enums": [ "CS0" ]
+				}
 			},
 
 			"CLASS_1_15": {
 				"comment": "Bulk traffic (HFSC LS + fq_codel)",
 				"helper": "hybrid_tin bulk",
+
 				"QDISC_15": { "helper": "hfsc_fq_codel -mem-coeff 1" },
-				"FILTERS": { "attach_to": "1:", "enums": [ "CS1" ] }
+
+				"FILTERS": {
+					"requires_or": [ "direction=DOWN", "SFO_ENABLED=1" ],
+					"attach_to": "1:",
+					"enums": [ "CS1" ]
+				}
 			},
 
 			"CLASS_1_11": {
 				"comment": "High priority realtime (HFSC RT + gameqdisc)",
 				"helper": "hfsc_tin realtime",
 
-				"FILTERS": { "attach_to": "1:", "enums": [ "EF", "CS5", "CS6", "CS7" ] },
+				"FILTERS": {
+					"requires_or": [ "direction=DOWN", "SFO_ENABLED=1" ],
+					"attach_to": "1:",
+					"enums": [ "EF", "CS5", "CS6", "CS7" ]
+				},
 
 				"QDISC_10": {
 					"helper": "hfsc_game",
@@ -40,11 +56,13 @@
 						"helper": "game_drr_qfq 8000",
 						"QDISC_11": { "helper": "red" }
 					},
+
 					"CLASS_10_2": {
 						"requires_or": [ "gameqdisc=drr", "gameqdisc=qfq" ],
 						"helper": "game_drr_qfq 4000",
 						"QDISC_12": { "helper": "red" }
 					},
+
 					"CLASS_10_3": {
 						"requires_or": [ "gameqdisc=drr", "gameqdisc=qfq" ],
 						"helper": "game_drr_qfq 1000",

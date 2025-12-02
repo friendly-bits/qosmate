@@ -62,36 +62,37 @@ hfsc_lan_class_helper() {
 }
 
 hfsc_tin_class_helper() {
-    local base_steady_rate="$NON_GAME_RATE" \
+    local \
+		curve_type="linkshare" \
+		base_steady_rate="$NON_GAME_RATE" \
+        base_burst_rate="$NON_GAME_RATE" \
         steady_percent \
-        base_burst_rate burst_percent
+		burst_percent
 
     case "$1" in
         realtime)
-            steady_percent=100
+			curve_type="realtime"
             base_burst_rate="$GAME_BURST_RATE"
+            base_steady_rate="$GAMERATE"
+            steady_percent=100
             burst_percent=100 ;;
         fast)
             steady_percent=30
-            base_burst_rate="$NON_GAME_RATE"
             burst_percent=70 ;;
         normal)
             steady_percent=45
-            base_burst_rate="$NON_GAME_RATE"
             burst_percent=20 ;;
         lowprio)
             steady_percent=15
-            base_burst_rate="$NON_GAME_RATE"
             burst_percent=7 ;;
         bulk)
             steady_percent=15
-            base_burst_rate="$NON_GAME_RATE"
             burst_percent=3 ;;
         *) # TODO: throw error
     esac
 
     append_params CLASS "qdisc:hfsc" &&
-    append_curve_params "linkshare" \
+    append_curve_params "$curve_type" \
         "steady_rate:$((base_steady_rate*steady_percent/100))" \
         "burst_rate:$((base_burst_rate*burst_percent/100))" \
         "burst_dur:$BURST_DUR" || return 1
@@ -299,36 +300,47 @@ apply_rules_hfsc() {
             # Fast
             create_class "hfsc_tin fast" "1:12" "1:1" &&
                 create_qdisc "hfsc_non_game" "" "1:12" || return 1
-                for family in ipv4 ipv6; do
-                    create_filters "1:" "CS4 AF41 AF42" "1:12" "$family" || return 1
-                done
+                if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
+                    for family in ipv4 ipv6; do
+                        create_filters "1:" "CS4 AF41 AF42" "1:12" "$family" || return 1
+                    done
+                fi
 
             # Normal (Default)
             create_class "hfsc_tin normal" "1:13" "1:1" &&
                 create_qdisc "hfsc_non_game" "" "1:13" || return 1
-                for family in ipv4 ipv6; do
-                    create_filters "1:" "CS0" "1:13" "$family" || return 1
-                done
+                if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
+                    for family in ipv4 ipv6; do
+                        create_filters "1:" "CS0" "1:13" "$family" || return 1
+                    done
+                fi
 
             # Low Prio
             create_class "hfsc_tin lowprio" "1:14" "1:1" &&
                 create_qdisc "hfsc_non_game" "" "1:14" || return 1
-                for family in ipv4 ipv6; do
-                    create_filters "1:" "CS2 AF11" "1:14" "$family" || return 1
-                done
+                if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
+                    for family in ipv4 ipv6; do
+                        create_filters "1:" "CS2 AF11" "1:14" "$family" || return 1
+                    done
+                fi
 
             # Bulk
             create_class "hfsc_tin bulk" "1:15" "1:1" &&
                 create_qdisc "hfsc_non_game" "" "1:15" || return 1
-                for family in ipv4 ipv6; do
-                    create_filters "1:" "CS1" "1:15" "$family" || return 1
-                done
+                if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
+                    for family in ipv4 ipv6; do
+                        create_filters "1:" "CS1" "1:15" "$family" || return 1
+                    done
+                fi
 
             # Game qdisc - Realtime
             create_class "hfsc_tin realtime" "1:11" "1:1" || return 1
-                for family in ipv4 ipv6; do
-                    create_filters "1:" "EF CS5 CS6 CS7" "1:11" "$family" || return 1
-                done
+                if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
+                    for family in ipv4 ipv6; do
+                        create_filters "1:" "EF CS5 CS6 CS7" "1:11" "$family" || return 1
+                    done
+                fi
+
                 create_qdisc "hfsc_game" "10:" "1:11" &&
                     case "$gameqdisc" in 'drr'|'qfq')
                         create_class "game_drr_qfq 8000" "10:1" "10:" &&
@@ -354,21 +366,28 @@ apply_rules_hybrid() {
 
             # CAKE (most traffic - default)
             create_class "hybrid_tin normal" "1:13" "1:1" &&
-                create_qdisc "hybrid_cake" "13:" "1:13" &&
-                create_filters "1:" "CS0" "1:13" "ipv6" &&
+                create_qdisc "hybrid_cake" "13:" "1:13" || return 1
+                if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
+                    create_filters "1:" "CS0" "1:13" "ipv6" || return 1
+                fi
 
             # Bulk traffic (HFSC LS + fq_codel)
             create_class "hybrid_tin bulk" "1:15" "1:1" &&
                 create_qdisc "hfsc_fq_codel -mem-coeff 1" "15:" "1:15" || return 1
-                for family in ipv4 ipv6; do
-                    create_filters "1:" "CS1" "1:15" "$family" || return 1
-                done
+                if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
+                    for family in ipv4 ipv6; do
+                        create_filters "1:" "CS1" "1:15" "$family" || return 1
+                    done
+                fi
 
             # High priority realtime (HFSC RT + gameqdisc)
             create_class "hfsc_tin realtime" "1:11" "1:1" || return 1
-                for family in ipv4 ipv6; do
-                    create_filters "1:" "EF CS5 CS6 CS7" "1:11" "$family" || return 1
-                done
+                if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
+                    for family in ipv4 ipv6; do
+                        create_filters "1:" "EF CS5 CS6 CS7" "1:11" "$family" || return 1
+                    done
+                fi
+
                 create_qdisc "hfsc_game" "10:" "1:11" &&
                     case "$gameqdisc" in 'drr'|'qfq')
                         create_class "game_drr_qfq 8000" "10:1" "10:" &&

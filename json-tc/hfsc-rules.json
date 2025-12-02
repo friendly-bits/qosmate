@@ -20,7 +20,12 @@
 				"helper": "hfsc_tin fast",
 
 				"QDISC": { "helper": "hfsc_non_game" },
-				"FILTERS": { "attach_to": "1:", "enums": [ "CS4", "AF41", "AF42" ] }
+
+				"FILTERS": {
+					"requires_or": [ "direction=DOWN", "SFO_ENABLED=1" ],
+					"attach_to": "1:",
+					"enums": [ "CS4", "AF41", "AF42" ]
+				}
 			},
 
 			"CLASS_1_13": {
@@ -28,7 +33,12 @@
 				"helper": "hfsc_tin normal",
 
 				"QDISC": { "helper": "hfsc_non_game" },
-				"FILTERS": { "attach_to": "1:", "enums": [ "CS0" ] }
+
+				"FILTERS": {
+					"requires_or": [ "direction=DOWN", "SFO_ENABLED=1" ],
+					"attach_to": "1:",
+					"enums": [ "CS0" ]
+				}
 			},
 
 			"CLASS_1_14": {
@@ -36,7 +46,12 @@
 				"helper": "hfsc_tin lowprio",
 
 				"QDISC": { "helper": "hfsc_non_game" },
-				"FILTERS": { "attach_to": "1:", "enums": [ "CS2", "AF11" ] }
+
+				"FILTERS": {
+					"requires_or": [ "direction=DOWN", "SFO_ENABLED=1" ],
+					"attach_to": "1:",
+					"enums": [ "CS2", "AF11" ]
+				}
 			},
 
 			"CLASS_1_15": {
@@ -44,14 +59,23 @@
 				"helper": "hfsc_tin bulk",
 
 				"QDISC": { "helper": "hfsc_non_game" },
-				"FILTERS": { "attach_to": "1:", "enums": [ "CS1" ] }
+
+				"FILTERS": {
+					"requires_or": [ "direction=DOWN", "SFO_ENABLED=1" ],
+					"attach_to": "1:",
+					"enums": [ "CS1" ]
+				}
 			},
 
 			"CLASS_1_11": {
 				"comment": "Game qdisc - Realtime",
 				"helper": "hfsc_tin realtime",
 
-				"FILTERS": { "attach_to": "1:", "enums": [ "EF", "CS5", "CS6", "CS7" ] },
+				"FILTERS": {
+					"requires_or": [ "direction=DOWN", "SFO_ENABLED=1" ],
+					"attach_to": "1:",
+					"enums": [ "EF", "CS5", "CS6", "CS7" ]
+				},
 
 				"QDISC_10": {
 					"helper": "hfsc_game",
@@ -61,11 +85,13 @@
 						"helper": "game_drr_qfq 8000",
 						"QDISC_11": { "helper": "red" }
 					},
+
 					"CLASS_10_2": {
 						"requires_or": [ "gameqdisc=drr", "gameqdisc=qfq" ],
 						"helper": "game_drr_qfq 4000",
 						"QDISC_12": { "helper": "red" }
 					},
+
 					"CLASS_10_3": {
 						"requires_or": [ "gameqdisc=drr", "gameqdisc=qfq" ],
 						"helper": "game_drr_qfq 1000",
