@@ -42,7 +42,7 @@
 				"helper": "htb_tin bulk",
 				"QDISC_150": {
 					"comment": "Background with larger target",
-					"helper": "htb_fq_codel quantum:300 targ_coeff:2"
+					"helper": "htb_fq_codel quantum:300 target_coeff:2 interval_coeff:2"
 				},
 
 				"FILTERS": {

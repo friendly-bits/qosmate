@@ -147,7 +147,7 @@ game_drr_qfq_class_helper() {
 hfsc_root_qdisc_helper() {
     append_params QDISC "qdisc:root" &&
     append_tc_overhead_params &&
-    append_params QDISC "qdisc:hfsc" "extra:default 13" || return 1
+    append_params QDISC "qdisc:hfsc" "STRING:default 13" || return 1
 }
 
 hfsc_non_game_qdisc_helper() {
@@ -173,7 +173,7 @@ hfsc_game_qdisc_helper() {
 hfsc_cake_qdisc_helper() {
     append_params QDISC \
         "qdisc:cake" \
-        "opt:extra:$nongameqdiscoptions" || return 1
+        "OPT:STRING:$nongameqdiscoptions" || return 1
 }
 
 # shellcheck disable=SC2120
@@ -202,20 +202,23 @@ hfsc_fq_codel_qdisc_helper() {
 }
 
 netem_qdisc_helper() {
-    local delay="$netemdelayms" \
-        jitter='' \
-        dist='' \
+    local delay_str='' \
+		delay="$netemdelayms" \
         pkt_loss=''
 
+	[ "$delay" -gt 0 ] || delay=0
+
     # If jitter is set but delay is 0, force minimum delay of 1ms
-    if [ "$netemjitterms" -gt 0 ] && ! [ "$netemdelayms" -gt 0 ]; then
+    if [ "$netemjitterms" -gt 0 ] && [ "$delay" -le 0 ]; then
         delay=1
     fi
 
+	delay_str="delay ${delay}ms"
+
     # Add delay parameter if set (either original or forced minimum)
     if [ "$delay" -gt 0 ] && [ "$netemjitterms" -gt 0 ]; then
-        jitter="${netemjitterms}"
-        dist="${netemdist}"
+		[ -n "$netemdist" ] || netemdist="normal"
+		delay_str="${delay_str} ${netemjitterms}ms distribution ${netemdist}"
     fi
 
     # Add packet loss if set
@@ -228,10 +231,8 @@ netem_qdisc_helper() {
     append_params QDISC \
         "qdisc:netem" \
         "limit:$(( 4 + 9*NON_GAME_RATE/8/500 ))" \
-        "delay:$delay" \
-        "opt:jitter:$jitter" \
-        "opt:distribution:$dist" \
-        "opt:pkt_loss:$pkt_loss" || return 1
+        "STRING:$delay_str" \
+        "OPT:pkt_loss:$pkt_loss" || return 1
 }
 
 red_qdisc_helper() {
@@ -259,26 +260,26 @@ hybrid_cake_qdisc_helper() {
     case "$DIR" in
         UP)
             append_params QDISC \
-                "extra:besteffort" \
-                "opt:extra:$EXTRA_PARAMETERS_EGRESS" \
+                "STRING:besteffort" \
+                "OPT:STRING:$EXTRA_PARAMETERS_EGRESS" \
                 "dual-srchost:$HOST_ISOLATION" \
                 "nat:$NAT_EGRESS" \
                 "wash:$WASHDSCPUP" ;;
         DOWN)
             append_params QDISC \
-                "extra:besteffort ingress" \
-                "opt:extra:$EXTRA_PARAMETERS_INGRESS" \
+                "STRING:besteffort ingress" \
+                "OPT:STRING:$EXTRA_PARAMETERS_INGRESS" \
                 "dual-dsthost:$HOST_ISOLATION" \
                 "nat:$NAT_INGRESS" \
                 "wash:$WASHDSCPDOWN"
     esac &&
     append_params QDISC \
-        "opt:rtt:$RTT" &&
+        "OPT:rtt:$RTT" &&
     append_cake_link_params -hybrid &&
     append_params QDISC \
-        "opt:mpu:$MPU" \
-        "opt:extra:$ETHER_VLAN_KEYWORD" \
-        "opt:extra:$LINK_COMPENSATION" || return 1
+        "OPT:mpu:$MPU" \
+        "OPT:STRING:$ETHER_VLAN_KEYWORD" \
+        "OPT:STRING:$LINK_COMPENSATION" || return 1
 }
 
 

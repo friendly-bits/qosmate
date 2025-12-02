@@ -116,15 +116,15 @@ htb_root_qdisc_helper() {
     # HTB root qdisc defaults to best effort (class 13)
     append_params QDISC "qdisc:root" &&
     append_tc_overhead_params &&
-    append_params QDISC "qdisc:htb" "extra:default 13" || return 1
+    append_params QDISC "qdisc:htb" "STRING:default 13" || return 1
 }
 
 htb_fq_codel_qdisc_helper() {
-    local arg var val quantum targ_coeff=1 inval_args=''
+    local arg var val quantum target_coeff=1 interval_coeff=1 inval_args=''
     for arg in "$@"; do
         var='' val=''
         case "$arg" in
-            "quantum:"*|"targ_coeff:"*)
+            "quantum:"*|"target_coeff:"*|"interval_coeff:"*)
                 var="${arg%%":"*}"
                 val="${arg#*":"}" ;;
             *) false
@@ -140,8 +140,8 @@ htb_fq_codel_qdisc_helper() {
 
     append_params QDISC \
         "qdisc:fq_codel" \
-        "interval:$(( 100 + 2*1500*8/HTB_RATE ))" \
-        "target:$(( 4 + targ_coeff*540*8/HTB_RATE ))" \
+        "interval:$(( interval_coeff * (100 + 2*1500*8/HTB_RATE) ))" \
+        "target:$(( target_coeff * (4 + 540*8/HTB_RATE) ))" \
         "quantum:$quantum" || return 1
 }
 
@@ -173,7 +173,7 @@ apply_rules_htb() {
             # Background/Bulk - low priority
             create_class "htb_tin bulk" "1:15" "1:1" &&
                 # Background with larger target
-                create_qdisc "htb_fq_codel quantum:300 targ_coeff:2" "150:" "1:15" || return 1
+                create_qdisc "htb_fq_codel quantum:300 target_coeff:2 interval_coeff:2" "150:" "1:15" || return 1
                 if [ "$DIR" = "DOWN" ] || [ "$SFO_ENABLED" = "1" ]; then
                     for family in ipv4 ipv6; do
                         create_filters "1:" "CS1" "1:15" "$family" || return 1
