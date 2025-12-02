@@ -170,14 +170,14 @@ create_tc_obj() {
         helper_str="$1" tc_obj_type="$2" tc_obj_id="$3" tc_parent_id="$4"
 
     case "$tc_obj_id" in
-        *![0-9:]*) false ;;
+        *[!0-9:]*) false ;;
         ''|*[0-9]:*) ;;
         *) false
     esac || { error_out "$me: Invalid object id '$tc_obj_id'"; return 1; }
 
     case "$tc_parent_id" in
         root) tc_parent_id='' ;;
-        *![0-9:]*) false ;;
+        *[!0-9:]*) false ;;
         *[0-9]:*) ;;
         *) false
     esac || { error_out "$me: Invalid parent id '$tc_parent_id' for object '$tc_obj_id'"; return 1; }

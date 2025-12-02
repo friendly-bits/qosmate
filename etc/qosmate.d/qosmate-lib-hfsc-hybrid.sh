@@ -185,7 +185,7 @@ hfsc_fq_codel_qdisc_helper() {
         '') ;;
         '-mem-coeff')
             case "$2" in
-                ''|*![0-9]*) false ;;
+                ''|*[!0-9]*) false ;;
                 *) mem_coeff="$2"
             esac ;;
         *) false
