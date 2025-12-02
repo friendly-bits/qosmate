@@ -341,7 +341,7 @@ try_setup_tc() {
 
     print_msg "Applying $rqdisc_print queueing discipline."
 
-    [ -f "$lib_file" ] || { error_out "Can not find '$lib_file'."; return 1; }
+    [ -f "$lib_file" ] || { error_out "Can not find $ROOT_QDISC lib at '$lib_file'."; return 1; }
     # shellcheck source=/dev/null
     . "$lib_file"
     $setup_cmd || return 1
