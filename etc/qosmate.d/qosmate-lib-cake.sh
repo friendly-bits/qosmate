@@ -11,7 +11,7 @@
 cake_root_qdisc_helper() {
     local ack_filter_egress_val
 
-    append_params QDISC "qdisc:cake" &&
+    append_params QDISC "qdisc:root" "qdisc:cake" &&
 
     case "$DIR" in
         UP)
@@ -23,7 +23,6 @@ cake_root_qdisc_helper() {
             esac
 
             append_params QDISC \
-                "qdisc:root" \
                 "bandwidth:$UPRATE" \
                 "STRING:$PRIORITY_QUEUE_EGRESS" \
                 "dual-srchost:$HOST_ISOLATION" \
@@ -39,7 +38,6 @@ cake_root_qdisc_helper() {
         DOWN)
             DEV="$LAN"
             append_params QDISC \
-                "qdisc:root" \
                 "bandwidth:$DOWNRATE" \
                 "STRING:ingress" \
                 "autorate-ingress:$AUTORATE_INGRESS" \
